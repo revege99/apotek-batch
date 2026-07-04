@@ -1,0 +1,501 @@
+<?php if (isset($component)) { $__componentOriginal9ac128a9029c0e4701924bd2d73d7f54 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal9ac128a9029c0e4701924bd2d73d7f54 = $attributes; } ?>
+<?php $component = App\View\Components\AppLayout::resolve([] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('app-layout'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\App\View\Components\AppLayout::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes([]); ?>
+     <?php $__env->slot('header', null, []); ?> 
+        <div class="space-y-4">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div class="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    <span><?php echo e($section); ?></span>
+                    <span class="text-slate-300">/</span>
+                    <span class="text-slate-600"><?php echo e($page['label']); ?></span>
+                </div>
+
+                <span x-data class="shrink-0">
+                    <button
+                        type="button"
+                        class="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+                        @click="$dispatch('open-create-medicine-modal')"
+                    >
+                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+                            <path d="M10 4.167v11.666M4.167 10h11.666" />
+                        </svg>
+                        Tambah Obat
+                    </button>
+                </span>
+            </div>
+        </div>
+     <?php $__env->endSlot(); ?>
+
+    <div
+        x-data="{
+            createModalOpen: <?php echo \Illuminate\Support\Js::from($errors->any() && old('_modal') === 'create')->toHtml() ?>,
+            detailModalOpen: false,
+            detailMedicine: null,
+            openDetail(medicine) {
+                this.detailMedicine = medicine;
+                this.detailModalOpen = true;
+            },
+            closeDetail() {
+                this.detailModalOpen = false;
+                this.detailMedicine = null;
+            },
+        }"
+        @open-create-medicine-modal.window="createModalOpen = true"
+        @keydown.escape.window="createModalOpen = false; closeDetail()"
+        class="space-y-5"
+    >
+        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div class="panel-surface stats-card">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="stats-card__label">Total obat</p>
+                        <p class="stats-card__value"><?php echo e(number_format($stats['total'])); ?></p>
+                    </div>
+
+                    <span class="stats-card__icon bg-emerald-50 text-emerald-600">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 12h6" />
+                            <path d="M12 9v6" />
+                            <path d="M7 5h10l2 4-7 10L5 9l2-4Z" />
+                        </svg>
+                    </span>
+                </div>
+            </div>
+
+            <div class="panel-surface stats-card">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="stats-card__label">Obat aktif</p>
+                        <p class="stats-card__value"><?php echo e(number_format($stats['active'])); ?></p>
+                    </div>
+
+                    <span class="stats-card__icon bg-sky-50 text-sky-600">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 12.75 11.25 15 15 9.75" />
+                            <circle cx="12" cy="12" r="8" />
+                        </svg>
+                    </span>
+                </div>
+            </div>
+
+            <div class="panel-surface stats-card">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="stats-card__label">Industri</p>
+                        <p class="stats-card__value"><?php echo e(number_format($stats['principal_count'])); ?></p>
+                    </div>
+
+                    <span class="stats-card__icon bg-amber-50 text-amber-600">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M8 4h8" />
+                            <path d="M10 4v5l-4.5 7.5A2 2 0 0 0 7.22 20h9.56a2 2 0 0 0 1.72-3.5L14 9V4" />
+                            <path d="M9.5 14h5" />
+                        </svg>
+                    </span>
+                </div>
+            </div>
+
+            <div class="panel-surface stats-card">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="stats-card__label">Ada komposisi</p>
+                        <p class="stats-card__value"><?php echo e(number_format($stats['composition_count'])); ?></p>
+                    </div>
+
+                    <span class="stats-card__icon bg-violet-50 text-violet-600">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M10 2v7.31" />
+                            <path d="M14 9.3V2" />
+                            <path d="M8.5 2h7" />
+                            <path d="M14 9.3 18.66 17a2 2 0 0 1-1.71 3H7.05a2 2 0 0 1-1.71-3L10 9.3" />
+                        </svg>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <section x-data="masterDeleteDialog()" @keydown.escape.window="closeDeleteDialog()" class="panel-surface overflow-hidden p-0">
+            <div class="border-b border-slate-200/80 px-6 py-5">
+                <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                    <div>
+                        <h3 class="section-title">Daftar obat</h3>
+                        <p class="mt-1 content-copy-muted">
+                            Lihat data obat, ubah, cek detail, dan hapus baris yang tidak dipakai.
+                        </p>
+                    </div>
+                </div>
+
+                <form method="GET" action="<?php echo e(route('master-data.data-obat')); ?>" class="mt-5 grid gap-3 xl:grid-cols-[minmax(0,1fr),180px,auto,auto]">
+                    <div>
+                        <label for="search" class="sr-only">Cari obat</label>
+                        <input
+                            id="search"
+                            name="search"
+                            type="text"
+                            value="<?php echo e($search); ?>"
+                            placeholder="Cari kode, nama, industri, kategori, atau komposisi"
+                            class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-100"
+                        >
+                    </div>
+
+                    <div>
+                        <label for="status" class="sr-only">Status</label>
+                        <select
+                            id="status"
+                            name="status"
+                            class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm transition focus:border-emerald-300 focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-100"
+                        >
+                            <option value="all" <?php if($status === 'all'): echo 'selected'; endif; ?>>Semua status</option>
+                            <option value="active" <?php if($status === 'active'): echo 'selected'; endif; ?>>Aktif</option>
+                            <option value="inactive" <?php if($status === 'inactive'): echo 'selected'; endif; ?>>Nonaktif</option>
+                        </select>
+                    </div>
+
+                    <button
+                        type="submit"
+                        class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+                    >
+                        Terapkan
+                    </button>
+
+                    <a
+                        href="<?php echo e(route('master-data.data-obat')); ?>"
+                        class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                    >
+                        Reset
+                    </a>
+                </form>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200/80 text-[0.8rem]">
+                    <thead class="bg-slate-50/90">
+                        <tr class="text-left text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                            <th class="px-5 py-4">Kode</th>
+                            <th class="px-5 py-4">Nama Obat</th>
+                            <th class="px-5 py-4">Kandungan</th>
+                            <th class="px-5 py-4">Satuan</th>
+                            <th class="px-5 py-4">Harga Beli</th>
+                            <th class="table-action-head">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200/80 bg-white">
+                        <?php $__empty_1 = true; $__currentLoopData = $medicines; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $medicine): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                            <?php
+                                $detailPayload = [
+                                    'code' => $medicine->code,
+                                    'name' => $medicine->name,
+                                    'principal_name' => $medicine->principal?->name ?: '-',
+                                    'medicine_type' => $medicine->medicine_type ?: '-',
+                                    'category_name' => $medicine->category_name ?: '-',
+                                    'medicine_group' => $medicine->medicine_group ?: '-',
+                                    'large_unit' => $medicine->large_unit ?: '-',
+                                    'small_unit' => $medicine->small_unit ?: '-',
+                                    'small_unit_per_large_unit' => $medicine->small_unit_per_large_unit ? number_format($medicine->small_unit_per_large_unit) : '-',
+                                    'purchase_price' => 'Rp '.number_format((float) $medicine->purchase_price, 0, ',', '.'),
+                                    'composition' => $medicine->composition ?: '-',
+                                    'status_label' => $medicine->is_active ? 'Aktif' : 'Nonaktif',
+                                    'status_active' => $medicine->is_active,
+                                    'created_at' => $medicine->created_at?->translatedFormat('d M Y H:i') ?? '-',
+                                ];
+                            ?>
+
+                            <tr class="align-top">
+                                <td class="px-5 py-4">
+                                    <div class="font-semibold text-slate-900"><?php echo e($medicine->code); ?></div>
+                                    <div class="mt-1 text-xs text-slate-400">ID <?php echo e($medicine->id); ?></div>
+                                </td>
+                                <td class="px-5 py-4">
+                                    <div class="font-semibold text-slate-900"><?php echo e($medicine->name); ?></div>
+                                </td>
+                                <td class="px-5 py-4">
+                                    <div class="max-w-sm content-copy">
+                                        <?php echo e($medicine->composition ? \Illuminate\Support\Str::limit($medicine->composition, 96) : 'Kandungan belum diisi.'); ?>
+
+                                    </div>
+                                </td>
+                                <td class="px-5 py-4">
+                                    <div class="font-medium text-slate-900">
+                                        <?php if($medicine->large_unit || $medicine->small_unit): ?>
+                                            <?php echo e($medicine->large_unit ?: '-'); ?> / <?php echo e($medicine->small_unit ?: '-'); ?>
+
+                                        <?php else: ?>
+                                            -
+                                        <?php endif; ?>
+                                    </div>
+                                    <?php if($medicine->small_unit_per_large_unit): ?>
+                                        <div class="mt-1 text-xs text-slate-500">Isi <?php echo e(number_format($medicine->small_unit_per_large_unit)); ?></div>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="px-5 py-4">
+                                    <div class="font-semibold text-slate-900">Rp <?php echo e(number_format((float) $medicine->purchase_price, 0, ',', '.')); ?></div>
+                                </td>
+                                <td class="table-action-cell">
+                                    <div class="table-action-group">
+                                        <a
+                                            href="<?php echo e(route('master-data.data-obat.edit', $medicine)); ?>"
+                                            class="table-icon-btn"
+                                            title="Ubah obat"
+                                            aria-label="Ubah <?php echo e($medicine->name); ?>"
+                                        >
+                                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M12 20h9" />
+                                                <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
+                                            </svg>
+                                            <span class="sr-only">Ubah</span>
+                                        </a>
+
+                                        <button
+                                            type="button"
+                                            @click="openDetail(<?php echo \Illuminate\Support\Js::from($detailPayload)->toHtml() ?>)"
+                                            class="table-icon-btn"
+                                            title="Lihat Detail"
+                                            aria-label="Lihat Detail <?php echo e($medicine->name); ?>"
+                                        >
+                                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M2.06 12.35a1 1 0 0 1 0-.7C3.2 8.38 6.52 5 12 5s8.8 3.38 9.94 6.65a1 1 0 0 1 0 .7C20.8 15.62 17.48 19 12 19s-8.8-3.38-9.94-6.65Z" />
+                                                <circle cx="12" cy="12" r="3" />
+                                            </svg>
+                                            <span class="sr-only">Lihat Detail</span>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            @click="openDeleteDialog(<?php echo \Illuminate\Support\Js::from([
+                                                'action' => route('master-data.data-obat.destroy', $medicine),
+                                                'title' => 'Hapus data obat ini?',
+                                                'description' => 'Obat '.$medicine->name.' akan dihapus dari master data obat.',
+                                                'warning' => 'Pastikan obat ini belum dipakai pada stok, pembelian, atau referensi transaksi lain.',
+                                                'name' => $medicine->name,
+                                                'code' => $medicine->code,
+                                                'confirm_label' => 'Ya, hapus obat',
+                                            ])->toHtml() ?>)"
+                                            class="table-icon-btn table-icon-btn--danger"
+                                            title="Hapus obat"
+                                            aria-label="Hapus <?php echo e($medicine->name); ?>"
+                                        >
+                                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M3 6h18" />
+                                                <path d="M8 6V4.75A1.75 1.75 0 0 1 9.75 3h4.5A1.75 1.75 0 0 1 16 4.75V6" />
+                                                <path d="M19 6l-.82 11.47A2 2 0 0 1 16.19 19H7.81a2 2 0 0 1-1.99-1.53L5 6" />
+                                                <path d="M10 10.5v5" />
+                                                <path d="M14 10.5v5" />
+                                            </svg>
+                                            <span class="sr-only">Hapus</span>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+                            <tr>
+                                <td colspan="6" class="px-5 py-14 text-center">
+                                    <div class="mx-auto max-w-md space-y-3">
+                                        <div class="empty-title">Belum ada data obat</div>
+                                        <p class="content-copy">
+                                            Tambah obat pertama untuk mulai mengisi kode barang, industri farmasi, jenis, kategori, satuan, harga beli, dan komposisi.
+                                        </p>
+                                        <button
+                                            type="button"
+                                            @click="createModalOpen = true"
+                                            class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+                                        >
+                                            Input obat pertama
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <?php if($medicines->hasPages()): ?>
+                <div class="border-t border-slate-200/80 px-6 py-4">
+                    <?php echo e($medicines->links()); ?>
+
+                </div>
+            <?php endif; ?>
+
+            <?php echo $__env->make('components.master-delete-modal', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+        </section>
+
+        <div
+            x-cloak
+            x-show="createModalOpen"
+            x-transition.opacity
+            class="fixed inset-0 z-40 overflow-y-auto bg-slate-950/50 backdrop-blur-sm"
+            @click.self="createModalOpen = false"
+        >
+            <div class="flex min-h-full items-start justify-center p-4 sm:items-center sm:p-6">
+                <div class="panel-surface relative z-50 max-h-[calc(100vh-2rem)] w-full max-w-5xl overflow-y-auto p-6 sm:max-h-[calc(100vh-3rem)] sm:p-7">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <div class="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                                Tambah Obat
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            class="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-900"
+                            @click="createModalOpen = false"
+                        >
+                            <span class="sr-only">Tutup modal</span>
+                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+                                <path d="M6 6l12 12M18 6 6 18" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <?php if($errors->any() && old('_modal') === 'create'): ?>
+                        <div class="mt-5 rounded-[1.35rem] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                            Periksa kembali input obat. Masih ada data yang perlu diperbaiki.
+                        </div>
+                    <?php endif; ?>
+
+                    <form method="POST" action="<?php echo e(route('master-data.data-obat.store')); ?>" class="mt-6 space-y-4">
+                        <?php echo csrf_field(); ?>
+                        <input type="hidden" name="_modal" value="create">
+
+                        <?php
+                            $medicine = $newMedicine;
+                            $selectedPrincipalId = old('principal_id');
+                        ?>
+
+                        <?php echo $__env->make('medicines._fields', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+
+                        <div class="flex flex-col gap-3 border-t border-slate-200/80 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                            <button
+                                type="button"
+                                class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                                @click="createModalOpen = false"
+                            >
+                                Batal
+                            </button>
+
+                            <button
+                                type="submit"
+                                class="inline-flex items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-600"
+                            >
+                                Simpan data obat
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div
+            x-cloak
+            x-show="detailModalOpen"
+            x-transition.opacity
+            class="fixed inset-0 z-40 overflow-y-auto bg-slate-950/50 backdrop-blur-sm"
+            @click.self="closeDetail()"
+        >
+            <div class="flex min-h-full items-start justify-center p-4 sm:items-center sm:p-6">
+                <div class="panel-surface relative z-50 max-h-[calc(100vh-2rem)] w-full max-w-4xl overflow-y-auto p-6 sm:max-h-[calc(100vh-3rem)] sm:p-7">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <div class="inline-flex items-center gap-2 rounded-full border border-sky-100 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
+                                Detail Obat
+                            </div>
+                            <h3 class="mt-4 page-title" x-text="detailMedicine?.name"></h3>
+                            <p class="mt-2 content-copy">
+                                <span class="font-semibold text-slate-800">Kode:</span>
+                                <span x-text="detailMedicine?.code"></span>
+                            </p>
+                        </div>
+
+                        <button
+                            type="button"
+                            class="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-900"
+                            @click="closeDetail()"
+                        >
+                            <span class="sr-only">Tutup detail</span>
+                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+                                <path d="M6 6l12 12M18 6 6 18" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        <div class="rounded-[1.35rem] border border-slate-200/80 bg-slate-50/80 p-4">
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Industri Farmasi</p>
+                            <p class="mt-2 text-[0.82rem] font-semibold text-slate-900" x-text="detailMedicine?.principal_name"></p>
+                        </div>
+
+                        <div class="rounded-[1.35rem] border border-slate-200/80 bg-slate-50/80 p-4">
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Jenis</p>
+                            <p class="mt-2 text-[0.82rem] font-semibold text-slate-900" x-text="detailMedicine?.medicine_type"></p>
+                        </div>
+
+                        <div class="rounded-[1.35rem] border border-slate-200/80 bg-slate-50/80 p-4">
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Kategori</p>
+                            <p class="mt-2 text-[0.82rem] font-semibold text-slate-900" x-text="detailMedicine?.category_name"></p>
+                        </div>
+
+                        <div class="rounded-[1.35rem] border border-slate-200/80 bg-slate-50/80 p-4">
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Golongan</p>
+                            <p class="mt-2 text-[0.82rem] font-semibold text-slate-900" x-text="detailMedicine?.medicine_group"></p>
+                        </div>
+
+                        <div class="rounded-[1.35rem] border border-slate-200/80 bg-slate-50/80 p-4">
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Satuan</p>
+                            <p class="mt-2 text-[0.82rem] font-semibold text-slate-900">
+                                <span x-text="detailMedicine?.large_unit"></span>
+                                <span class="text-slate-400"> / </span>
+                                <span x-text="detailMedicine?.small_unit"></span>
+                            </p>
+                        </div>
+
+                        <div class="rounded-[1.35rem] border border-slate-200/80 bg-slate-50/80 p-4">
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Isi</p>
+                            <p class="mt-2 text-[0.82rem] font-semibold text-slate-900" x-text="detailMedicine?.small_unit_per_large_unit"></p>
+                        </div>
+
+                        <div class="rounded-[1.35rem] border border-slate-200/80 bg-slate-50/80 p-4">
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Harga Beli</p>
+                            <p class="mt-2 text-[0.82rem] font-semibold text-slate-900" x-text="detailMedicine?.purchase_price"></p>
+                        </div>
+
+                        <div class="rounded-[1.35rem] border border-slate-200/80 bg-slate-50/80 p-4">
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Status</p>
+                            <span
+                                class="mt-2 inline-flex rounded-full px-3 py-1 text-xs font-semibold"
+                                :class="detailMedicine?.status_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'"
+                                x-text="detailMedicine?.status_label"
+                            ></span>
+                        </div>
+
+                        <div class="rounded-[1.35rem] border border-slate-200/80 bg-slate-50/80 p-4">
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Dibuat</p>
+                            <p class="mt-2 text-[0.82rem] font-semibold text-slate-900" x-text="detailMedicine?.created_at"></p>
+                        </div>
+                    </div>
+
+                    <div class="mt-5 rounded-[1.45rem] border border-slate-200/80 bg-white p-5">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Kandungan / Komposisi</p>
+                        <p class="mt-3 whitespace-pre-line text-sm leading-7 text-slate-700" x-text="detailMedicine?.composition"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+ <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal9ac128a9029c0e4701924bd2d73d7f54)): ?>
+<?php $attributes = $__attributesOriginal9ac128a9029c0e4701924bd2d73d7f54; ?>
+<?php unset($__attributesOriginal9ac128a9029c0e4701924bd2d73d7f54); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal9ac128a9029c0e4701924bd2d73d7f54)): ?>
+<?php $component = $__componentOriginal9ac128a9029c0e4701924bd2d73d7f54; ?>
+<?php unset($__componentOriginal9ac128a9029c0e4701924bd2d73d7f54); ?>
+<?php endif; ?>
+<?php /**PATH C:\laragon\www\apotik\resources\views/medicines/index.blade.php ENDPATH**/ ?>

@@ -1,0 +1,537 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    :root {
+        color-scheme: light;
+    }
+
+    body {
+        @apply bg-slate-100 text-slate-900;
+        background-image:
+            radial-gradient(circle at top left, rgba(16, 185, 129, 0.18), transparent 28%),
+            radial-gradient(circle at top right, rgba(14, 165, 233, 0.16), transparent 24%),
+            linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+    }
+
+    [x-cloak] {
+        display: none !important;
+    }
+
+    ::selection {
+        @apply bg-emerald-200 text-slate-950;
+    }
+
+    @keyframes shrink {
+        from {
+            transform: scaleX(1);
+        }
+
+        to {
+            transform: scaleX(0);
+        }
+    }
+
+    @keyframes app-loading-spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    @keyframes app-loading-slide {
+        0% {
+            transform: translateX(-45%);
+        }
+
+        100% {
+            transform: translateX(140%);
+        }
+    }
+}
+
+@layer components {
+    .panel-surface {
+        @apply rounded-[1rem] border border-white/70 bg-white/90 shadow-[0_24px_60px_-24px_rgba(15,23,42,0.35)] backdrop-blur;
+    }
+
+    .stats-card {
+        @apply p-3;
+    }
+
+    .stats-card__label {
+        @apply text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-400;
+    }
+
+    .stats-card__value {
+        @apply mt-1 text-2xl font-semibold leading-none text-slate-950;
+    }
+
+    .stats-card__icon {
+        @apply inline-flex h-8 w-8 items-center justify-center rounded-lg;
+    }
+
+    .page-title {
+        @apply text-lg font-semibold tracking-tight text-slate-950 sm:text-xl;
+    }
+
+    .section-title {
+        @apply text-base font-semibold text-slate-950;
+    }
+
+    .section-title-lg {
+        @apply text-lg font-semibold text-slate-950;
+    }
+
+    .content-copy {
+        @apply text-[0.78rem] leading-5 text-slate-600;
+    }
+
+    .content-copy-muted {
+        @apply text-[0.78rem] leading-5 text-slate-500;
+    }
+
+    .empty-title {
+        @apply text-base font-semibold text-slate-900;
+    }
+
+    .table-action-head {
+        @apply px-4 py-2.5 text-center;
+    }
+
+    .master-table > thead {
+        @apply bg-slate-50/95;
+    }
+
+    .master-table > thead > tr > th {
+        position: sticky;
+        top: -20px;
+        z-index: 10;
+        background: rgba(248, 250, 252, 0.95);
+        backdrop-filter: blur(8px);
+        box-shadow: 0 1px 0 rgba(226, 232, 240, 0.9);
+    }
+
+    .table-action-cell {
+        @apply px-4 py-2.5 align-middle;
+    }
+
+    .table-action-group {
+        @apply flex items-center justify-center gap-2;
+    }
+
+    .table-action-group > form {
+        display: inline-flex;
+    }
+
+    .table-icon-btn {
+        @apply inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700;
+    }
+
+    .table-icon-btn--danger {
+        @apply border-rose-200 bg-rose-50 text-rose-700 hover:border-rose-300 hover:bg-rose-100 hover:text-rose-800;
+    }
+
+    .ui-control {
+        @apply w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-[0.82rem] font-normal text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-100;
+        height: 35px;
+    }
+
+    .ui-select-control {
+        @apply ui-control pr-10;
+    }
+
+    .ui-control--sky {
+        @apply focus:border-sky-300 focus:ring-sky-100;
+    }
+
+    .ui-control--amber {
+        @apply focus:border-amber-300 focus:ring-amber-100;
+    }
+
+    .ui-action-btn {
+        @apply inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border px-4 text-[0.82rem] font-medium shadow-sm transition;
+        height: 35px;
+    }
+
+    .ui-action-btn--neutral {
+        @apply border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50;
+    }
+
+    .ui-action-btn--soft {
+        @apply border-slate-200 bg-white text-slate-800 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700;
+    }
+
+    .app-loading-shell {
+        @apply fixed inset-0 z-[120] flex items-center justify-center backdrop-blur-[2px];
+        background-color: rgba(2, 6, 23, 0.22);
+    }
+
+    .app-loading-card {
+        @apply relative flex w-[min(22rem,calc(100vw-2rem))] items-center gap-3 overflow-hidden rounded-2xl border px-4 py-3 shadow-[0_24px_50px_-24px_rgba(15,23,42,0.45)];
+        border-color: rgba(255, 255, 255, 0.8);
+        background-color: rgba(255, 255, 255, 0.96);
+    }
+
+    .app-loading-spinner {
+        @apply relative h-10 w-10 shrink-0 rounded-full border-2 border-slate-200 border-t-emerald-500 bg-white;
+        animation: app-loading-spin 0.75s linear infinite;
+    }
+
+    .app-loading-bar {
+        @apply absolute inset-x-0 bottom-0 h-1 overflow-hidden bg-slate-100;
+    }
+
+    .app-loading-bar::after {
+        content: '';
+        @apply absolute inset-y-0 left-0 w-24 rounded-full bg-gradient-to-r from-emerald-400 via-sky-400 to-emerald-400;
+        animation: app-loading-slide 1.1s ease-in-out infinite;
+    }
+
+    .purchase-detail-control {
+        height: 35px !important;
+        min-height: 35px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        line-height: 1 !important;
+    }
+
+    .number-input-no-spinner {
+        -moz-appearance: textfield;
+        appearance: textfield;
+    }
+
+    .number-input-no-spinner::-webkit-inner-spin-button,
+    .number-input-no-spinner::-webkit-outer-spin-button {
+        margin: 0;
+        -webkit-appearance: none;
+    }
+
+    .apotik-sidebar {
+        --sidebar-bg-primary: rgba(255, 255, 255, 0.96);
+        --sidebar-bg-secondary: #f8fafc;
+        --sidebar-bg-tertiary: #eef2f7;
+        --sidebar-border-primary: rgba(148, 163, 184, 0.22);
+        --sidebar-border-secondary: rgba(148, 163, 184, 0.16);
+        --sidebar-text-primary: #0f172a;
+        --sidebar-text-secondary: #475569;
+        --sidebar-text-tertiary: #94a3b8;
+        --sidebar-accent-soft: #d1fae5;
+        --sidebar-accent-muted: #a7f3d0;
+        --sidebar-accent-strong: #065f46;
+        display: flex;
+        height: 100%;
+        flex-direction: column;
+        overflow: hidden;
+        background: var(--sidebar-bg-primary);
+    }
+
+    .apotik-sidebar__brand {
+        padding: 1rem 0.85rem 0.9rem;
+        border-bottom: 1px solid var(--sidebar-border-secondary);
+    }
+
+    .apotik-sidebar__brand-inner {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+    }
+
+    .apotik-sidebar__brand-icon {
+        display: flex;
+        width: 2.25rem;
+        height: 2.25rem;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.7rem;
+        background: linear-gradient(135deg, #10b981, #14b8a6);
+        color: white;
+        box-shadow: 0 10px 24px -16px rgba(16, 185, 129, 0.9);
+        flex-shrink: 0;
+    }
+
+    .apotik-sidebar__brand-label,
+    .apotik-sidebar__brand-name {
+        display: block;
+    }
+
+    .apotik-sidebar__brand-label {
+        font-size: 0.625rem;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--sidebar-text-tertiary);
+    }
+
+    .apotik-sidebar__brand-name {
+        margin-top: 0.15rem;
+        font-size: 0.88rem;
+        font-weight: 600;
+        line-height: 1.2;
+        color: var(--sidebar-text-primary);
+    }
+
+    .apotik-sidebar__scroll {
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 0.65rem 0.65rem 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+    }
+
+    .apotik-sidebar__scroll::-webkit-scrollbar {
+        width: 0.2rem;
+    }
+
+    .apotik-sidebar__scroll::-webkit-scrollbar-thumb {
+        background: rgba(148, 163, 184, 0.5);
+        border-radius: 999px;
+    }
+
+    .apotik-sidebar__section-label {
+        padding: 0.45rem 0.4rem 0.25rem;
+        font-size: 0.625rem;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--sidebar-text-tertiary);
+    }
+
+    .apotik-sidebar__stack {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .apotik-sidebar__divider {
+        height: 1px;
+        margin: 0.1rem 0.4rem;
+        background: var(--sidebar-border-secondary);
+    }
+
+    .apotik-sidebar__item,
+    .apotik-sidebar__group-header {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        gap: 0.55rem;
+        padding: 0.48rem 0.55rem;
+        border-radius: 0.7rem;
+        border: 1px solid transparent;
+        background: transparent;
+        text-decoration: none;
+        transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+    }
+
+    .apotik-sidebar__item:hover,
+    .apotik-sidebar__group-header:hover,
+    .apotik-sidebar__group.is-open .apotik-sidebar__group-header {
+        background: var(--sidebar-bg-secondary);
+    }
+
+    .apotik-sidebar__item.is-active {
+        background: var(--sidebar-accent-soft);
+        border-color: rgba(167, 243, 208, 0.85);
+    }
+
+    .apotik-sidebar__icon {
+        display: flex;
+        width: 1.85rem;
+        height: 1.85rem;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.6rem;
+        background: var(--sidebar-bg-secondary);
+        color: var(--sidebar-text-secondary);
+        flex-shrink: 0;
+        transition: background-color 150ms ease, color 150ms ease;
+    }
+
+    .apotik-sidebar__item.is-active .apotik-sidebar__icon,
+    .apotik-sidebar__group.is-open .apotik-sidebar__icon {
+        background: var(--sidebar-accent-muted);
+        color: var(--sidebar-accent-strong);
+    }
+
+    .apotik-sidebar__text {
+        flex: 1;
+        min-width: 0;
+        font-size: 0.78rem;
+        font-weight: 500;
+        color: var(--sidebar-text-secondary);
+        text-align: left;
+    }
+
+    .apotik-sidebar__item.is-active .apotik-sidebar__text,
+    .apotik-sidebar__group.is-open .apotik-sidebar__text {
+        color: var(--sidebar-accent-strong);
+    }
+
+    .apotik-sidebar__badge {
+        flex-shrink: 0;
+        padding: 0.12rem 0.4rem;
+        border-radius: 999px;
+        font-size: 0.58rem;
+        font-weight: 700;
+        color: var(--sidebar-accent-strong);
+        background: var(--sidebar-accent-soft);
+    }
+
+    .apotik-sidebar__chevron {
+        width: 0.95rem;
+        height: 0.95rem;
+        color: var(--sidebar-text-tertiary);
+        flex-shrink: 0;
+        transition: transform 180ms ease, color 180ms ease;
+    }
+
+    .apotik-sidebar__chevron.is-open {
+        transform: rotate(90deg);
+        color: var(--sidebar-accent-strong);
+    }
+
+    .apotik-sidebar__children {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+        padding: 0.15rem 0 0.3rem 0.75rem;
+        margin-left: 0.85rem;
+        border-left: 1px solid var(--sidebar-border-primary);
+    }
+
+    .apotik-sidebar__child {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.36rem 0.45rem;
+        border-radius: 0.6rem;
+        border: 1px solid transparent;
+        text-decoration: none;
+        transition: background-color 150ms ease, border-color 150ms ease;
+    }
+
+    .apotik-sidebar__child:hover {
+        background: var(--sidebar-bg-secondary);
+        border-color: rgba(148, 163, 184, 0.12);
+    }
+
+    .apotik-sidebar__child.is-active {
+        background: var(--sidebar-accent-soft);
+        border-color: rgba(167, 243, 208, 0.85);
+    }
+
+    .apotik-sidebar__child-dot {
+        width: 0.35rem;
+        height: 0.35rem;
+        border-radius: 999px;
+        flex-shrink: 0;
+        background: rgba(148, 163, 184, 0.8);
+    }
+
+    .apotik-sidebar__child-dot.is-active {
+        background: #10b981;
+    }
+
+    .apotik-sidebar__child-text {
+        min-width: 0;
+        font-size: 0.74rem;
+        line-height: 1.15rem;
+        color: var(--sidebar-text-secondary);
+    }
+
+    .apotik-sidebar__child-text.is-active {
+        font-weight: 600;
+        color: var(--sidebar-accent-strong);
+    }
+
+    .apotik-sidebar__user-area {
+        padding: 0.65rem;
+        border-top: 1px solid var(--sidebar-border-secondary);
+    }
+
+    .apotik-sidebar__user-card {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        padding: 0.6rem;
+        border-radius: 0.85rem;
+        background: var(--sidebar-bg-secondary);
+    }
+
+    .apotik-sidebar__avatar {
+        display: flex;
+        width: 2rem;
+        height: 2rem;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.68rem;
+        background: linear-gradient(135deg, #10b981, #34d399);
+        color: white;
+        font-size: 0.72rem;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+
+    .apotik-sidebar__user-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .apotik-sidebar__user-name {
+        font-size: 0.76rem;
+        font-weight: 600;
+        color: var(--sidebar-text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .apotik-sidebar__user-meta {
+        margin-top: 0.1rem;
+        font-size: 0.66rem;
+        color: var(--sidebar-text-tertiary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .apotik-sidebar__user-actions {
+        display: flex;
+        gap: 0.3rem;
+        margin-top: 0.45rem;
+    }
+
+    .apotik-sidebar__user-btn {
+        display: inline-flex;
+        width: 100%;
+        align-items: center;
+        justify-content: center;
+        gap: 0.35rem;
+        padding: 0.42rem 0.5rem;
+        border-radius: 0.65rem;
+        border: 1px solid var(--sidebar-border-primary);
+        background: white;
+        color: var(--sidebar-text-secondary);
+        font-size: 0.68rem;
+        font-weight: 600;
+        text-decoration: none;
+        transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+    }
+
+    .apotik-sidebar__user-btn:hover {
+        background: var(--sidebar-bg-secondary);
+    }
+
+    .apotik-sidebar__user-btn--logout {
+        background: var(--sidebar-accent-soft);
+        border-color: rgba(167, 243, 208, 0.85);
+        color: var(--sidebar-accent-strong);
+    }
+
+    .apotik-sidebar__user-btn--logout:hover {
+        background: var(--sidebar-accent-muted);
+    }
+}
