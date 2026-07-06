@@ -313,7 +313,6 @@ class CustomerReceivableController extends Controller
     private function customerReceivableQuery(string $search = ''): Builder
     {
         return $this->outstandingSaleBaseQuery($search)
-            ->join('customers', 'sales.customer_id', '=', 'customers.id')
             ->selectRaw('
                 sales.customer_id,
                 customers.name as customer_name,
@@ -377,8 +376,7 @@ class CustomerReceivableController extends Controller
                         ->orWhere('customers.name', 'like', "%{$search}%")
                         ->orWhere('sales.sale_number', 'like', "%{$search}%");
                 });
-            })
-            ->select('sales.*');
+            });
     }
 
     /**
