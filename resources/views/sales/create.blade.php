@@ -185,11 +185,11 @@
                                 <th class="px-1.5 py-1.5">Batch</th>
                                 <th class="px-1 py-1.5">Expired</th>
                                 <th class="px-1 py-1.5 text-right">Harga Dasar</th>
-                                <th class="px-1.5 py-1.5 text-center">Markup %</th>
+                                <th class="px-1 py-1.5 text-center" style="width: 4.4rem; min-width: 4.4rem; max-width: 4.4rem;">Markup %</th>
                                 <th class="px-1.5 py-1.5 text-right">Stok Batch</th>
                                 <th class="px-1.5 py-1.5 text-right">Harga Jual</th>
                                 <th class="px-1.5 py-1.5 text-center">Qty</th>
-                                <th class="px-1.5 py-1.5 text-right">Subtotal</th>
+                                <th class="px-3 py-1.5 text-right">Subtotal</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-200/80 bg-white text-[0.78rem]">
@@ -222,17 +222,18 @@
 
                                     <td class="whitespace-nowrap px-1 py-1.5 text-right font-semibold text-slate-700" x-text="currency(row.base_unit_cost)"></td>
 
-                                    <td class="px-1.5 py-1.5 text-center">
-                                        <div class="mx-auto w-[5.75rem]">
+                                    <td class="px-1 py-1.5 text-center" style="width: 4.4rem; min-width: 4.4rem; max-width: 4.4rem;">
+                                        <div class="mx-auto" style="width: 3.2rem; min-width: 3.2rem; max-width: 3.2rem;">
                                             <input
                                                 type="number"
                                                 min="0"
                                                 step="0.01"
                                                 x-model="row.markup_percentage"
-                                                class="number-input-no-spinner block w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-center text-[0.78rem] text-slate-900 shadow-sm transition focus:border-emerald-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                                                class="number-input-no-spinner block rounded-lg border border-slate-200 bg-slate-50 px-1 py-1 text-center text-[0.76rem] text-slate-900 shadow-sm transition focus:border-emerald-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                                                style="width: 3.2rem; min-width: 3.2rem; max-width: 3.2rem;"
                                                 @input.debounce.150ms="handleMarkupInput(row)"
                                             >
-                                            <p class="mt-0.5 text-[0.66rem] text-slate-500">persen</p>
+                                            <p class="mt-0.5 text-[0.62rem] text-slate-500">persen</p>
                                         </div>
                                     </td>
 
@@ -255,7 +256,7 @@
                                         >
                                     </td>
 
-                                    <td class="min-w-[5.25rem] whitespace-nowrap px-1 py-1.5 text-right">
+                                    <td class="min-w-[5.25rem] whitespace-nowrap px-3 py-1.5 text-right">
                                         <p class="font-semibold text-slate-900" x-text="currency(row.line_total)"></p>
                                         <p class="mt-0.5 text-[0.68rem] text-slate-500" x-text="row.composition"></p>
                                     </td>
@@ -314,6 +315,7 @@
             <input type="hidden" name="payment_kind" :value="payment_kind">
             <input type="hidden" name="payment_method" :value="payment_method">
             <input type="hidden" name="paid_amount" :value="effectivePaidAmount()">
+            <input type="hidden" name="other_cost_amount" :value="effectiveOtherCostAmount()">
         </form>
 
         <div
@@ -359,14 +361,32 @@
                     </div>
 
                     <div class="mt-3">
-                        <label for="sale_notes_modal" class="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-slate-500">Catatan</label>
-                        <input
-                            id="sale_notes_modal"
-                            type="text"
-                            x-model="notes"
-                            placeholder="Opsional, misalnya titipan resep atau catatan pelanggan"
-                            class="ui-control mt-2 px-3 text-[0.72rem] placeholder:text-[0.68rem]"
-                        >
+                        <div class="grid gap-3 md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+                            <div>
+                                <label for="sale_other_cost_amount" class="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-slate-500">Biaya lain-lain</label>
+                                <input
+                                    x-ref="otherCostAmountInput"
+                                    id="sale_other_cost_amount"
+                                    type="text"
+                                    inputmode="decimal"
+                                    :value="other_cost_amount_display"
+                                    @input="handleOtherCostAmountInput($event)"
+                                    placeholder="Contoh biaya gojek atau biaya tambahan lain"
+                                    class="ui-control mt-2 px-3 text-[0.72rem] placeholder:text-[0.68rem]"
+                                >
+                            </div>
+
+                            <div>
+                                <label for="sale_notes_modal" class="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-slate-500">Catatan</label>
+                                <input
+                                    id="sale_notes_modal"
+                                    type="text"
+                                    x-model="notes"
+                                    placeholder="Opsional, misalnya titipan resep atau catatan pelanggan"
+                                    class="ui-control mt-2 px-3 text-[0.72rem] placeholder:text-[0.68rem]"
+                                >
+                            </div>
+                        </div>
                     </div>
 
                     <div class="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.08fr)_minmax(19rem,0.92fr)] lg:items-start">
@@ -458,17 +478,18 @@
                                 </div>
                             </div>
 
-                            <div x-show="isSocialPayment()" x-transition class="space-y-2">
-                            <input
-                                x-ref="paymentCashAmountInput"
-                                id="payment_paid_amount"
-                                type="text"
-                                inputmode="decimal"
-                                :value="paid_amount_display"
-                                @input="handlePaidAmountInput($event)"
-                                class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:border-emerald-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                                :placeholder="payment_kind === 'social' ? 'Masukkan nominal yang benar-benar dibayar' : 'Masukkan nominal bayar tunai'"
-                            >
+                            <div x-show="usesCashChange() || isSocialPayment()" x-transition class="space-y-2">
+                                <label for="payment_paid_amount" class="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-slate-500" x-text="payment_kind === 'social' ? 'Nominal dibayar' : 'Uang diterima'"></label>
+                                <input
+                                    x-ref="paymentCashAmountInput"
+                                    id="payment_paid_amount"
+                                    type="text"
+                                    inputmode="decimal"
+                                    :value="paid_amount_display"
+                                    @input="handlePaidAmountInput($event)"
+                                    class="ui-control w-full px-3 text-[0.78rem] placeholder:text-[0.68rem]"
+                                    :placeholder="payment_kind === 'social' ? 'Masukkan nominal yang benar-benar dibayar' : 'Masukkan uang yang diberikan pelanggan'"
+                                >
                                 <p x-show="paymentShortfall() > 0" class="text-xs font-medium" :class="payment_kind === 'social' ? 'text-sky-700' : 'text-rose-600'">
                                     <span x-text="payment_kind === 'social' ? 'Nilai sosial ' : 'Kurang bayar '"></span><span x-text="currency(paymentShortfall())"></span>
                                 </p>
@@ -477,6 +498,11 @@
 
                         <div class="space-y-3">
                             <div class="grid gap-2.5 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3 sm:grid-cols-2 lg:grid-cols-1">
+                                <div x-show="effectiveOtherCostAmount() > 0">
+                                    <p class="text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-slate-500">Biaya lain-lain</p>
+                                    <p class="mt-1 text-sm font-semibold text-slate-900" x-text="currency(effectiveOtherCostAmount())"></p>
+                                </div>
+
                                 <div>
                                     <p class="text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-slate-500">Jumlah bayar</p>
                                     <p class="mt-1 text-sm font-semibold text-slate-900" x-text="currency(effectivePaidAmount())"></p>

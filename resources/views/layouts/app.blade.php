@@ -5,7 +5,17 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <title>{{ config('app.name') === 'Laravel' ? config('apotik.brand.name') : config('app.name', config('apotik.brand.name')) }}</title>
+        @php
+            $brandTitle = config('app.name') === 'Laravel'
+                ? config('apotik.brand.name')
+                : config('app.name', config('apotik.brand.name'));
+            $pageTitle = trim(collect([
+                $section ?? null,
+                data_get($page ?? [], 'label'),
+            ])->filter()->implode(' - '));
+        @endphp
+
+        <title>{{ $pageTitle !== '' ? $pageTitle.' | '.$brandTitle : $brandTitle }}</title>
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">

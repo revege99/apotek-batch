@@ -200,38 +200,39 @@ class SaleController extends Controller
                 $paymentKind = (string) $validated['payment_kind'];
                 $paymentMethod = (string) $validated['payment_method'];
                 $paidAmountInput = round((float) $validated['paid_amount'], 2);
+                $otherCostAmount = round((float) $validated['other_cost_amount'], 2);
                 $salePaymentMethod = $paymentMethod;
                 $discountAmount = 0.0;
                 $socialAmount = 0.0;
-                $grandTotal = $subtotal;
+                $grandTotal = round($subtotal + $otherCostAmount, 2);
                 $paidAmount = 0.0;
                 $changeAmount = 0.0;
 
                 if ($paymentKind === 'credit') {
                     $salePaymentMethod = 'credit';
                 } elseif ($paymentKind === 'social') {
-                    $paidAmount = min($paidAmountInput, $subtotal);
+                    $paidAmount = min($paidAmountInput, $grandTotal);
 
                     if ($paidAmount <= 0.001) {
                         throw new RuntimeException('Nominal pembayaran sosial harus lebih besar dari nol.');
                     }
 
-                    if ($paidAmount - $subtotal > 0.001) {
+                    if ($paidAmount - $grandTotal > 0.001) {
                         throw new RuntimeException('Nominal pembayaran sosial tidak boleh melebihi total penjualan.');
                     }
 
-                    $socialAmount = round(max($subtotal - $paidAmount, 0), 2);
+                    $socialAmount = round(max($grandTotal - $paidAmount, 0), 2);
 
                     if ($socialAmount <= 0.001) {
                         throw new RuntimeException('Gunakan pembayaran biasa jika pelanggan membayar penuh tanpa sosial.');
                     }
                 } else {
-                    $paidAmount = $paymentMethod === 'cash' ? $paidAmountInput : $subtotal;
+                    $paidAmount = $paymentMethod === 'cash' ? $paidAmountInput : $grandTotal;
                     $changeAmount = $paymentMethod === 'cash'
-                        ? round(max($paidAmount - $subtotal, 0), 2)
+                        ? round(max($paidAmount - $grandTotal, 0), 2)
                         : 0.0;
 
-                    if ($paidAmount + 0.001 < $subtotal) {
+                    if ($paidAmount + 0.001 < $grandTotal) {
                         throw new RuntimeException('Nominal bayar masih kurang dari total penjualan.');
                     }
                 }
@@ -250,6 +251,7 @@ class SaleController extends Controller
                     'discount_amount' => $discountAmount,
                     'social_amount' => $socialAmount,
                     'tax_amount' => 0,
+                    'other_cost_amount' => $otherCostAmount,
                     'grand_total' => $grandTotal,
                     'paid_amount' => $paidAmount,
                     'change_amount' => $changeAmount,
@@ -258,7 +260,7 @@ class SaleController extends Controller
                         paymentKind: $paymentKind,
                         paymentMethod: $paymentMethod,
                         paidAmount: $paidAmount,
-                        subtotal: $subtotal,
+                        grandTotal: $grandTotal,
                         socialAmount: $socialAmount,
                     ),
                     'created_by' => $request->user()?->id,
@@ -357,38 +359,39 @@ class SaleController extends Controller
                 $paymentKind = (string) $validated['payment_kind'];
                 $paymentMethod = (string) $validated['payment_method'];
                 $paidAmountInput = round((float) $validated['paid_amount'], 2);
+                $otherCostAmount = round((float) $validated['other_cost_amount'], 2);
                 $salePaymentMethod = $paymentMethod;
                 $discountAmount = 0.0;
                 $socialAmount = 0.0;
-                $grandTotal = $subtotal;
+                $grandTotal = round($subtotal + $otherCostAmount, 2);
                 $paidAmount = 0.0;
                 $changeAmount = 0.0;
 
                 if ($paymentKind === 'credit') {
                     $salePaymentMethod = 'credit';
                 } elseif ($paymentKind === 'social') {
-                    $paidAmount = min($paidAmountInput, $subtotal);
+                    $paidAmount = min($paidAmountInput, $grandTotal);
 
                     if ($paidAmount <= 0.001) {
                         throw new RuntimeException('Nominal pembayaran sosial harus lebih besar dari nol.');
                     }
 
-                    if ($paidAmount - $subtotal > 0.001) {
+                    if ($paidAmount - $grandTotal > 0.001) {
                         throw new RuntimeException('Nominal pembayaran sosial tidak boleh melebihi total penjualan.');
                     }
 
-                    $socialAmount = round(max($subtotal - $paidAmount, 0), 2);
+                    $socialAmount = round(max($grandTotal - $paidAmount, 0), 2);
 
                     if ($socialAmount <= 0.001) {
                         throw new RuntimeException('Gunakan pembayaran biasa jika pelanggan membayar penuh tanpa sosial.');
                     }
                 } else {
-                    $paidAmount = $paymentMethod === 'cash' ? $paidAmountInput : $subtotal;
+                    $paidAmount = $paymentMethod === 'cash' ? $paidAmountInput : $grandTotal;
                     $changeAmount = $paymentMethod === 'cash'
-                        ? round(max($paidAmount - $subtotal, 0), 2)
+                        ? round(max($paidAmount - $grandTotal, 0), 2)
                         : 0.0;
 
-                    if ($paidAmount + 0.001 < $subtotal) {
+                    if ($paidAmount + 0.001 < $grandTotal) {
                         throw new RuntimeException('Nominal bayar masih kurang dari total penjualan.');
                     }
                 }
@@ -406,6 +409,7 @@ class SaleController extends Controller
                     'discount_amount' => $discountAmount,
                     'social_amount' => $socialAmount,
                     'tax_amount' => 0,
+                    'other_cost_amount' => $otherCostAmount,
                     'grand_total' => $grandTotal,
                     'paid_amount' => $paidAmount,
                     'change_amount' => $changeAmount,
@@ -414,7 +418,7 @@ class SaleController extends Controller
                         paymentKind: $paymentKind,
                         paymentMethod: $paymentMethod,
                         paidAmount: $paidAmount,
-                        subtotal: $subtotal,
+                        grandTotal: $grandTotal,
                         socialAmount: $socialAmount,
                     ),
                 ]);
@@ -649,6 +653,7 @@ class SaleController extends Controller
             ),
             'payment_method' => (string) $request->session()->getOldInput('payment_method', 'cash'),
             'paid_amount' => (string) $request->session()->getOldInput('paid_amount', ''),
+            'other_cost_amount' => (string) $request->session()->getOldInput('other_cost_amount', ''),
             'notes' => (string) $request->session()->getOldInput('notes', ''),
             'items' => $this->initialItems($request),
         ];
@@ -707,6 +712,10 @@ class SaleController extends Controller
             'paid_amount' => (string) $request->session()->getOldInput(
                 'paid_amount',
                 $sale->payment_method === 'credit' ? '' : ($sale->paid_amount > 0 ? $sale->paid_amount : '')
+            ),
+            'other_cost_amount' => (string) $request->session()->getOldInput(
+                'other_cost_amount',
+                (float) $sale->other_cost_amount > 0.001 ? $sale->other_cost_amount : ''
             ),
             'notes' => (string) $request->session()->getOldInput('notes', $sale->notes ?? ''),
             'items' => $items,
@@ -982,6 +991,7 @@ class SaleController extends Controller
                         'group_name' => $sale->customerGroup?->name ?: '-',
                         'item_count' => number_format($groupedItems->count()),
                         'subtotal' => $this->formatCurrency((float) $sale->subtotal),
+                        'other_cost_amount' => $this->formatCurrency((float) $sale->other_cost_amount),
                         'social_amount' => $this->formatCurrency((float) $sale->social_amount),
                         'paid_amount' => $this->formatCurrency((float) $sale->paid_amount),
                         'change_amount' => $this->formatCurrency((float) $sale->change_amount),
@@ -1106,7 +1116,7 @@ class SaleController extends Controller
         string $paymentKind,
         string $paymentMethod,
         float $paidAmount,
-        float $subtotal,
+        float $grandTotal,
         float $socialAmount,
     ): ?string {
         $cleanNotes = filled($notes) ? trim((string) $notes) : null;
@@ -1126,7 +1136,7 @@ class SaleController extends Controller
             $paymentMethodLabel,
             $this->formatCurrency($paidAmount),
             $this->formatCurrency($socialAmount),
-            $this->formatCurrency($subtotal),
+            $this->formatCurrency($grandTotal),
         );
 
         return $cleanNotes !== null && $cleanNotes !== ''

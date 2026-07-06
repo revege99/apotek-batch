@@ -508,7 +508,10 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 
-    Alpine.data('purchaseInvoiceForm', (config = {}, supplierOptions = []) => ({
+    Alpine.data('purchaseInvoiceForm', (config = {}, supplierOptions = []) => {
+        const medicineCatalog = Array.isArray(config.catalog) ? config.catalog : [];
+
+        return ({
         invoice_number: config.invoice_number ?? '',
         invoice_date: config.invoice_date ?? '',
         supplier_id: config.supplier_id ?? '',
@@ -518,6 +521,8 @@ document.addEventListener('alpine:init', () => {
         suppliers: Array.isArray(supplierOptions) ? supplierOptions : [],
         rows: [],
         searchTerm: '',
+        baseVisibleMedicineLimit: 30,
+        searchVisibleRowLimit: 50,
         nextFilledOrder: 1,
         nextDynamicRowId: 1,
         paymentModalOpen: false,
@@ -528,6 +533,7 @@ document.addEventListener('alpine:init', () => {
             this.rows = initialItems.map((item) => this.hydrateRow(item));
             this.nextDynamicRowId = this.rows.length + 1;
             this.payment_kind = String(this.payment_method ?? '') === 'credit' ? 'credit' : 'cash';
+            this.syncCatalogRows();
             this.rows.forEach((row) => this.refreshRow(row, false));
             this.ensureCompanionRows();
             this.normalizePaymentState();
@@ -587,6 +593,7 @@ document.addEventListener('alpine:init', () => {
 
         setSearchTerm(value) {
             this.searchTerm = value;
+            this.syncCatalogRows();
         },
 
         hasActiveSearch() {
@@ -717,7 +724,7 @@ document.addEventListener('alpine:init', () => {
             const query = String(this.searchTerm ?? '').trim().toLocaleLowerCase('id-ID');
 
             if (query === '') {
-                return this.rowIsUsed(row) || this.isPrimaryPlaceholderRow(row);
+                return true;
             }
 
             return [
@@ -729,6 +736,26 @@ document.addEventListener('alpine:init', () => {
 
         visibleRowCount() {
             return this.rows.filter((row) => this.rowMatchesSearch(row)).length;
+        },
+
+        displayRows() {
+            return this.rows.filter((row) => this.rowMatchesSearch(row));
+        },
+
+        hasHiddenRows() {
+            if (String(this.searchTerm ?? '').trim() !== '') {
+                return this.filteredCatalogItems().length > this.searchVisibleRowLimit;
+            }
+
+            return medicineCatalog.length > this.baseVisibleMedicineLimit;
+        },
+
+        hiddenRowsCount() {
+            if (String(this.searchTerm ?? '').trim() !== '') {
+                return Math.max(this.filteredCatalogItems().length - this.searchVisibleRowLimit, 0);
+            }
+
+            return Math.max(medicineCatalog.length - this.baseVisibleMedicineLimit, 0);
         },
 
         uniqueMedicineIds() {
@@ -774,6 +801,79 @@ document.addEventListener('alpine:init', () => {
                 discount_amount: '',
                 discount_mode: 'percent',
                 update_master_purchase_price: false,
+            });
+        },
+
+        buildCatalogPlaceholderRow(item) {
+            return this.hydrateRow({
+                ...item,
+                key: `medicine-${item.medicine_id}-base`,
+            });
+        },
+
+        filteredCatalogItems() {
+            const query = String(this.searchTerm ?? '').trim().toLocaleLowerCase('id-ID');
+
+            if (query === '') {
+                return medicineCatalog;
+            }
+
+            return medicineCatalog.filter((item) => {
+                return [
+                    item.medicine_code,
+                    item.medicine_name,
+                    item.composition,
+                ].some((value) => String(value ?? '').toLocaleLowerCase('id-ID').includes(query));
+            });
+        },
+
+        syncCatalogRows() {
+            const hasQuery = String(this.searchTerm ?? '').trim() !== '';
+            const targetItems = this.filteredCatalogItems().slice(0, hasQuery ? this.searchVisibleRowLimit : this.baseVisibleMedicineLimit);
+            const targetIds = new Set(targetItems.map((item) => String(item.medicine_id ?? '')));
+            const usedMedicineIds = new Set(
+                this.rows
+                    .filter((row) => this.rowIsUsed(row))
+                    .map((row) => String(row.medicine_id ?? ''))
+                    .filter((value) => value !== ''),
+            );
+
+            this.rows = this.rows.filter((row) => {
+                const medicineId = String(row.medicine_id ?? '');
+
+                if (this.rowIsUsed(row)) {
+                    return true;
+                }
+
+                if (this.rowReadyForCompanion(row)) {
+                    return true;
+                }
+
+                if (usedMedicineIds.has(medicineId)) {
+                    return true;
+                }
+
+                return targetIds.has(medicineId);
+            });
+
+            targetItems.forEach((item) => {
+                const medicineId = String(item.medicine_id ?? '');
+                const hasAnyRow = this.rows.some((row) => String(row.medicine_id ?? '') === medicineId);
+
+                if (! hasAnyRow) {
+                    this.rows.push(this.buildCatalogPlaceholderRow(item));
+                }
+            });
+
+            this.rows = [...this.rows].sort((firstRow, secondRow) => {
+                const firstOrder = Number(firstRow.group_order ?? 0);
+                const secondOrder = Number(secondRow.group_order ?? 0);
+
+                if (firstOrder !== secondOrder) {
+                    return firstOrder - secondOrder;
+                }
+
+                return String(firstRow.medicine_name ?? '').localeCompare(String(secondRow.medicine_name ?? ''), 'id');
             });
         },
 
@@ -838,6 +938,7 @@ document.addEventListener('alpine:init', () => {
             });
 
             this.uniqueMedicineIds().forEach((medicineId) => this.ensureCompanionRowsForMedicine(medicineId));
+            this.syncCatalogRows();
             this.sortRowsByFilled(true);
         },
 
@@ -1122,7 +1223,8 @@ document.addEventListener('alpine:init', () => {
         formatQuantity(value) {
             return numberFormatter.format(roundCurrency(toNumber(value, 0)));
         },
-    }));
+    });
+    });
 
     Alpine.data('saleForm', (config = {}, customerOptions = []) => ({
         sale_number: config.sale_number ?? '',
@@ -1134,6 +1236,8 @@ document.addEventListener('alpine:init', () => {
         payment_kind: config.payment_kind ?? 'cash',
         paid_amount: config.paid_amount ?? '',
         paid_amount_display: '',
+        other_cost_amount: config.other_cost_amount ?? '',
+        other_cost_amount_display: '',
         notes: config.notes ?? '',
         customers: Array.isArray(customerOptions) ? customerOptions : [],
         rows: [],
@@ -1170,6 +1274,7 @@ document.addEventListener('alpine:init', () => {
             }
 
             this.normalizePaymentState();
+            this.syncOtherCostAmountDisplay();
             this.syncPaidAmount();
             this.syncCustomerSearch();
         },
@@ -1889,6 +1994,35 @@ document.addEventListener('alpine:init', () => {
                 : '';
         },
 
+        syncOtherCostAmountDisplay() {
+            this.other_cost_amount_display = this.formatMoneyInput(this.other_cost_amount);
+        },
+
+        handleOtherCostAmountInput(event) {
+            const parsedValue = this.parseMoneyInput(event?.target?.value ?? this.other_cost_amount_display);
+            const rawValue = String(parsedValue ?? '').trim();
+
+            if (rawValue === '') {
+                this.other_cost_amount = '';
+                this.syncOtherCostAmountDisplay();
+                this.syncPaidAmount();
+
+                if (event?.target) {
+                    event.target.value = this.other_cost_amount_display;
+                }
+
+                return;
+            }
+
+            this.other_cost_amount = this.sanitizeMoneyValue(parsedValue);
+            this.syncOtherCostAmountDisplay();
+            this.syncPaidAmount();
+
+            if (event?.target) {
+                event.target.value = this.other_cost_amount_display;
+            }
+        },
+
         handlePaidAmountInput(event) {
             if (! this.usesCashChange() && ! this.isSocialPayment()) {
                 this.syncPaidAmount();
@@ -1954,8 +2088,21 @@ document.addEventListener('alpine:init', () => {
             return this.rows.filter((row) => this.rowIsUsed(row)).length;
         },
 
+        effectiveOtherCostAmount() {
+            const rawValue = String(this.other_cost_amount ?? '').trim();
+
+            if (rawValue === '') {
+                return 0;
+            }
+
+            return roundCurrency(Math.max(toNumber(this.other_cost_amount, 0), 0));
+        },
+
         grandTotal() {
-            return roundCurrency(this.rows.reduce((total, row) => total + toNumber(row.line_total, 0), 0));
+            return roundCurrency(
+                this.rows.reduce((total, row) => total + toNumber(row.line_total, 0), 0)
+                + this.effectiveOtherCostAmount()
+            );
         },
 
         changeAmount() {

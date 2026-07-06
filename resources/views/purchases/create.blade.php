@@ -129,7 +129,7 @@
 
             <section class="panel-surface rounded-[1.2rem] flex min-h-0 flex-1 flex-col overflow-hidden p-0">
                 <div class="min-h-0 flex-1 overflow-auto">
-                    <table class="min-w-[1120px] w-full divide-y divide-slate-200/80 text-[0.72rem]">
+                    <table class="min-w-[1090px] w-full divide-y divide-slate-200/80 text-[0.72rem]">
                         <thead class="sticky top-0 z-10 bg-slate-50/95 shadow-[0_1px_0_rgba(226,232,240,0.9)] backdrop-blur">
                             <tr class="text-left text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
                                 <th class="px-2 py-1.5">Obat</th>
@@ -148,11 +148,11 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-200/80 bg-white text-[0.78rem]">
-                            <template x-for="(row, index) in rows" :key="row.key">
-                                <tr x-show="rowMatchesSearch(row)" class="align-middle" :class="{ 'bg-emerald-50/30': rowIsUsed(row) }">
+                            <template x-for="(row, index) in displayRows()" :key="row.key">
+                                <tr class="align-middle" :class="{ 'bg-emerald-50/30': rowIsUsed(row) }">
                                     <td class="px-2 py-1.5">
-                                        <input type="hidden" :name="rowIsUsed(row) ? `items[${index}][medicine_id]` : null" :value="row.medicine_id">
-                                        <input type="hidden" :name="rowIsUsed(row) ? `items[${index}][discount_mode]` : null" :value="row.discount_mode">
+                                        <input type="hidden" :name="rowIsUsed(row) ? `items[${rows.indexOf(row)}][medicine_id]` : null" :value="row.medicine_id">
+                                        <input type="hidden" :name="rowIsUsed(row) ? `items[${rows.indexOf(row)}][discount_mode]` : null" :value="row.discount_mode">
                                         <p class="min-w-[130px] max-w-[170px] truncate font-semibold text-slate-900" x-text="row.medicine_name" :title="row.medicine_name"></p>
                                         <p class="mt-0.5 text-[0.68rem] text-slate-500" x-text="row.medicine_code"></p>
                                     </td>
@@ -163,12 +163,12 @@
 
                                     <td class="px-1 py-1.5 text-center">
                                         <input
-                                            :name="rowIsUsed(row) ? `items[${index}][unit_content]` : null"
+                                            :name="rowIsUsed(row) ? `items[${rows.indexOf(row)}][unit_content]` : null"
                                             type="number"
                                             min="0.01"
                                             step="0.01"
                                             x-model="row.unit_content"
-                                            class="ui-control purchase-detail-control number-input-no-spinner mx-auto block w-14 rounded-lg px-1.5 text-center text-[0.78rem] font-medium"
+                                            class="ui-control purchase-detail-control number-input-no-spinner mx-auto block w-[2.8rem] rounded-lg px-1 text-center text-[0.78rem] font-medium"
                                             @input.debounce.150ms="handleUnitContentInput(row)"
                                         >
                                     </td>
@@ -180,7 +180,7 @@
 
                                     <td class="px-2 py-1.5 text-center">
                                         <input
-                                            :name="rowIsUsed(row) ? `items[${index}][batch_number]` : null"
+                                            :name="rowIsUsed(row) ? `items[${rows.indexOf(row)}][batch_number]` : null"
                                             type="text"
                                             x-model="row.batch_number"
                                             placeholder="No batch"
@@ -191,7 +191,7 @@
 
                                     <td class="px-0.5 py-1.5 text-center">
                                         <input
-                                            :name="rowIsUsed(row) ? `items[${index}][expiry_date]` : null"
+                                            :name="rowIsUsed(row) ? `items[${rows.indexOf(row)}][expiry_date]` : null"
                                             type="date"
                                             x-model="row.expiry_date"
                                             class="ui-control purchase-detail-control mx-auto block w-[7rem] rounded-lg px-1.5 text-center text-[0.72rem]"
@@ -201,9 +201,9 @@
 
                                     <td class="px-0.5 py-1.5 text-center">
                                         <select
-                                            :name="rowIsUsed(row) ? `items[${index}][storage_location_id]` : null"
+                                            :name="rowIsUsed(row) ? `items[${rows.indexOf(row)}][storage_location_id]` : null"
                                             x-model="row.storage_location_id"
-                                            class="ui-select-control purchase-detail-control mx-auto block w-[7.4rem] rounded-lg px-2 text-center text-[0.72rem]"
+                                            class="ui-select-control purchase-detail-control mx-auto block w-[4.9rem] rounded-lg px-1 text-center text-[0.72rem]"
                                             @change="handleRowMetaInput(row)"
                                         >
                                             <option value="">Pilih lokasi</option>
@@ -215,7 +215,7 @@
 
                                     <td class="px-0.5 py-1.5 text-center">
                                         <input
-                                            :name="rowIsUsed(row) ? `items[${index}][quantity]` : null"
+                                            :name="rowIsUsed(row) ? `items[${rows.indexOf(row)}][quantity]` : null"
                                             type="number"
                                             min="0"
                                             step="0.01"
@@ -228,7 +228,7 @@
                                     <td class="px-0.5 py-1.5 text-center">
                                         <input
                                             type="hidden"
-                                            :name="rowIsUsed(row) ? `items[${index}][unit_price]` : null"
+                                            :name="rowIsUsed(row) ? `items[${rows.indexOf(row)}][unit_price]` : null"
                                             :value="row.unit_price"
                                         >
                                         <input
@@ -243,12 +243,12 @@
                                     <td class="px-0.5 py-1.5 text-center">
                                         <input
                                             type="hidden"
-                                            :name="rowIsUsed(row) ? `items[${index}][update_master_purchase_price]` : null"
+                                            :name="rowIsUsed(row) ? `items[${rows.indexOf(row)}][update_master_purchase_price]` : null"
                                             value="0"
                                         >
                                         <input
                                             type="checkbox"
-                                            :name="rowIsUsed(row) ? `items[${index}][update_master_purchase_price]` : null"
+                                            :name="rowIsUsed(row) ? `items[${rows.indexOf(row)}][update_master_purchase_price]` : null"
                                             value="1"
                                             :checked="row.update_master_purchase_price"
                                             class="h-3.5 w-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-200"
@@ -259,12 +259,12 @@
 
                                     <td class="px-0.5 py-1.5 text-center">
                                         <input
-                                            :name="rowIsUsed(row) ? `items[${index}][discount_percentage]` : null"
+                                            :name="rowIsUsed(row) ? `items[${rows.indexOf(row)}][discount_percentage]` : null"
                                             type="number"
                                             min="0"
                                             step="0.01"
                                             x-model="row.discount_percentage"
-                                            class="ui-control purchase-detail-control number-input-no-spinner mx-auto block w-14 rounded-lg px-1.5 text-center text-[0.78rem]"
+                                            class="ui-control purchase-detail-control number-input-no-spinner mx-auto block w-[3rem] rounded-lg px-1 text-center text-[0.78rem]"
                                             @input.debounce.150ms="applyPercent(row)"
                                         >
                                     </td>
@@ -272,7 +272,7 @@
                                     <td class="px-0.5 py-1.5 text-center">
                                         <input
                                             type="hidden"
-                                            :name="rowIsUsed(row) ? `items[${index}][discount_amount]` : null"
+                                            :name="rowIsUsed(row) ? `items[${rows.indexOf(row)}][discount_amount]` : null"
                                             :value="row.discount_amount"
                                         >
                                         <input
@@ -295,6 +295,16 @@
 
                 <div x-show="visibleRowCount() === 0" class="border-t border-slate-200/80 px-4 py-5 text-center text-xs text-slate-500">
                     Obat tidak ditemukan.
+                </div>
+
+                <div x-show="hasHiddenRows()" class="border-t border-slate-200/80 px-4 py-2 text-[0.68rem] text-slate-500">
+                    <span x-show="!hasActiveSearch()">
+                        Menampilkan <span class="font-semibold text-slate-700" x-text="displayRows().length"></span> obat awal.
+                        <span class="font-semibold text-slate-700" x-text="hiddenRowsCount()"></span> obat lain disembunyikan sementara agar form lebih ringan. Gunakan pencarian untuk menampilkan obat lain.
+                    </span>
+                    <span x-show="hasActiveSearch()">
+                        Hasil pencarian dibatasi <span class="font-semibold text-slate-700" x-text="searchVisibleRowLimit"></span> baris pertama agar form tetap ringan.
+                    </span>
                 </div>
 
                 <div class="sticky bottom-0 z-20 shrink-0 border-t border-slate-200/80 bg-white/95 px-4 py-2.5 backdrop-blur">

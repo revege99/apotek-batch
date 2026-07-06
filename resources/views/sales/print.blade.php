@@ -282,6 +282,12 @@
             <td class="summary-label">TOTAL ITEM</td>
             <td class="summary-value">Rp {{ number_format((float) $sale->subtotal, 0, ',', '.') }}</td>
         </tr>
+        @if ((float) $sale->other_cost_amount > 0)
+            <tr>
+                <td class="summary-label">BIAYA LAIN-LAIN</td>
+                <td class="summary-value">Rp {{ number_format((float) $sale->other_cost_amount, 0, ',', '.') }}</td>
+            </tr>
+        @endif
         @if ((float) $sale->social_amount > 0)
             <tr>
                 <td class="summary-label">SOSIAL</td>

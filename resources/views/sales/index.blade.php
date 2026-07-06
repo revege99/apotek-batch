@@ -344,6 +344,7 @@
                     <div class="mt-4 flex flex-wrap justify-end gap-x-5 gap-y-2 text-[0.76rem]">
                         <p class="text-slate-500">Item <span class="ml-1 font-semibold text-slate-900" x-text="detailSale?.item_count"></span></p>
                         <p class="text-slate-500">Subtotal <span class="ml-1 font-semibold text-slate-900" x-text="detailSale?.subtotal"></span></p>
+                        <p x-show="detailSale?.other_cost_amount && detailSale.other_cost_amount !== 'Rp 0'" class="text-slate-500">Biaya lain-lain <span class="ml-1 font-semibold text-slate-900" x-text="detailSale?.other_cost_amount"></span></p>
                         <p x-show="detailSale?.social_amount && detailSale.social_amount !== 'Rp 0'" class="text-sky-700">Sosial <span class="ml-1 font-semibold" x-text="detailSale?.social_amount"></span></p>
                         <p class="text-slate-500">Bayar <span class="ml-1 font-semibold text-slate-900" x-text="detailSale?.paid_amount"></span></p>
                         <p class="text-slate-500">Kembali <span class="ml-1 font-semibold text-slate-900" x-text="detailSale?.change_amount"></span></p>

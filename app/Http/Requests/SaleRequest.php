@@ -59,6 +59,7 @@ class SaleRequest extends FormRequest
             'payment_kind' => ['required', Rule::in(['cash', 'social', 'credit'])],
             'payment_method' => ['required', Rule::in(['cash', 'transfer', 'qris', 'debit', 'credit'])],
             'paid_amount' => ['required', 'numeric', 'min:0'],
+            'other_cost_amount' => ['required', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.medicine_id' => ['required', Rule::exists('medicines', 'id')],

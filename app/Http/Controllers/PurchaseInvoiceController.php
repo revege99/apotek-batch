@@ -92,6 +92,7 @@ class PurchaseInvoiceController extends Controller
                 'supplier_id' => (string) $request->session()->getOldInput('supplier_id', ''),
                 'payment_method' => (string) $request->session()->getOldInput('payment_method', 'credit'),
                 'tax_percentage' => (string) $request->session()->getOldInput('tax_percentage', '11'),
+                'catalog' => $this->medicineCatalog($request),
                 'items' => $this->initialItems($request),
             ],
             'formAction' => route('pembelian.input-faktur-pembelian.store'),
@@ -120,6 +121,7 @@ class PurchaseInvoiceController extends Controller
                 'supplier_id' => (string) $request->session()->getOldInput('supplier_id', $purchaseInvoice->supplier_id),
                 'payment_method' => (string) $request->session()->getOldInput('payment_method', $this->resolveInitialPaymentMethod($purchaseInvoice)),
                 'tax_percentage' => (string) $request->session()->getOldInput('tax_percentage', $purchaseInvoice->tax_percentage),
+                'catalog' => $this->medicineCatalog($request, $purchaseInvoice),
                 'items' => $this->initialItems($request, $purchaseInvoice),
             ],
             'formAction' => route('pembelian.data-pembelian.update', $purchaseInvoice),
@@ -576,46 +578,14 @@ class PurchaseInvoiceController extends Controller
             ->unique()
             ->values();
 
-        $medicineRows = Medicine::query()
-            ->where(function ($query) use ($oldMedicineIds) {
-                $query->where('is_active', true);
-
-                if ($oldMedicineIds->isNotEmpty()) {
-                    $query->orWhereIn('id', $oldMedicineIds);
-                }
-            })
-            ->orderBy('name')
-            ->get()
-            ->values()
-            ->map(function (Medicine $medicine, int $groupOrder) use ($defaultLocationId): array {
-                return [
-                    'key' => 'medicine-'.$medicine->id.'-base',
-                    'group_order' => $groupOrder,
-                    'medicine_id' => $medicine->id,
-                    'medicine_code' => $medicine->code,
-                    'medicine_name' => $medicine->name,
-                    'medicine_label' => trim($medicine->code.' - '.$medicine->name),
-                    'composition' => $medicine->composition ?: '',
-                    'purchase_unit' => $medicine->small_unit ?: '-',
-                    'unit_content' => $medicine->small_unit_per_large_unit ?: 1,
-                    'storage_location_id' => $defaultLocationId,
-                    'batch_number' => '',
-                    'expiry_date' => '',
-                    'quantity' => '',
-                    'unit_price' => '',
-                    'discount_percentage' => '',
-                    'discount_amount' => '',
-                    'discount_mode' => 'percent',
-                ];
-            })
-            ->keyBy(fn (array $row): int => (int) $row['medicine_id']);
-
         if ($rawItems->isEmpty()) {
-            return $medicineRows->values()->all();
+            return [];
         }
 
+        $medicineRows = $this->medicineCatalogRows($oldMedicineIds, $defaultLocationId)
+            ->keyBy(fn (array $row): int => (int) $row['medicine_id']);
+
         $rows = [];
-        $usedMedicineIds = [];
 
         foreach ($rawItems as $index => $item) {
             $medicineId = (int) ($item['medicine_id'] ?? 0);
@@ -641,19 +611,80 @@ class PurchaseInvoiceController extends Controller
                     ? (string) $item['update_master_purchase_price']
                     : '0',
             ];
-
-            $usedMedicineIds[$medicineId] = true;
-        }
-
-        foreach ($medicineRows as $medicineId => $baseRow) {
-            if (isset($usedMedicineIds[$medicineId])) {
-                continue;
-            }
-
-            $rows[] = $baseRow;
         }
 
         return array_values($rows);
+    }
+
+    /**
+     * Build the lightweight medicine catalog used by the purchase form search.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function medicineCatalog(Request $request, ?PurchaseInvoice $purchaseInvoice = null): array
+    {
+        $defaultLocationId = $this->defaultPurchaseLocationId();
+        $oldMedicineIds = collect($request->session()->getOldInput('items', []))
+            ->filter(fn ($item): bool => is_array($item))
+            ->pluck('medicine_id')
+            ->filter()
+            ->map(fn ($id): int => (int) $id)
+            ->values();
+
+        if ($purchaseInvoice !== null) {
+            $oldMedicineIds = $oldMedicineIds->merge(
+                $purchaseInvoice->items()
+                    ->pluck('medicine_id')
+                    ->map(fn ($id): int => (int) $id)
+            );
+        }
+
+        return $this->medicineCatalogRows(
+            $oldMedicineIds->unique()->values(),
+            $defaultLocationId,
+        )->all();
+    }
+
+    /**
+     * Build reusable catalog rows for medicines.
+     *
+     * @param  Collection<int, int>  $selectedMedicineIds
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function medicineCatalogRows(Collection $selectedMedicineIds, string $defaultLocationId): Collection
+    {
+        return Medicine::query()
+            ->where(function ($query) use ($selectedMedicineIds) {
+                $query->where('is_active', true);
+
+                if ($selectedMedicineIds->isNotEmpty()) {
+                    $query->orWhereIn('id', $selectedMedicineIds);
+                }
+            })
+            ->orderBy('name')
+            ->get()
+            ->values()
+            ->map(function (Medicine $medicine, int $groupOrder) use ($defaultLocationId): array {
+                return [
+                    'key' => 'medicine-'.$medicine->id.'-base',
+                    'group_order' => $groupOrder,
+                    'medicine_id' => $medicine->id,
+                    'medicine_code' => $medicine->code,
+                    'medicine_name' => $medicine->name,
+                    'medicine_label' => trim($medicine->code.' - '.$medicine->name),
+                    'composition' => $medicine->composition ?: '',
+                    'purchase_unit' => $medicine->small_unit ?: '-',
+                    'unit_content' => $medicine->small_unit_per_large_unit ?: 1,
+                    'storage_location_id' => $defaultLocationId,
+                    'batch_number' => '',
+                    'expiry_date' => '',
+                    'quantity' => '',
+                    'unit_price' => '',
+                    'discount_percentage' => '',
+                    'discount_amount' => '',
+                    'discount_mode' => 'percent',
+                ];
+            });
     }
 
     /**
