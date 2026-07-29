@@ -23,6 +23,24 @@
     </x-slot>
 
     <div x-data="saleForm(@js($initialForm), @js($customerLookupOptions))" @keydown.escape.window="closePaymentModal()" class="-mt-2 flex h-full min-h-0 flex-col space-y-2 overflow-x-hidden overflow-y-visible">
+        <div
+            x-cloak
+            x-show="stockWarning !== ''"
+            x-transition.opacity
+            class="fixed right-4 top-4 z-[90] flex max-w-sm items-start gap-3 border border-rose-200 bg-rose-50 px-4 py-3 text-rose-800 shadow-lg sm:right-6 sm:top-6"
+        >
+            <svg class="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <path d="M12 9v4m0 4h.01" />
+                <path d="M10.3 3.7 2.2 18a2 2 0 0 0 1.7 3h16.2a2 2 0 0 0 1.7-3L13.7 3.7a2 2 0 0 0-3.4 0Z" />
+            </svg>
+            <p class="min-w-0 flex-1 text-[0.76rem] font-medium leading-5" x-text="stockWarning"></p>
+            <button type="button" class="shrink-0 text-rose-500 hover:text-rose-700" @click="stockWarning = ''" aria-label="Tutup peringatan stok">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <path d="m6 6 12 12M18 6 6 18" />
+                </svg>
+            </button>
+        </div>
+
         @if ($customerOptions->isEmpty())
             <div class="rounded-[1.35rem] border border-amber-200 bg-amber-50 px-4 py-3 text-[0.78rem] text-amber-800">
                 Pelanggan aktif belum tersedia. Tambahkan pelanggan lebih dulu dari master data agar harga jual bisa mengikuti golongan markup.
@@ -178,18 +196,29 @@
                 </div>
 
                 <div class="min-h-0 flex-1 overflow-auto">
-                    <table class="min-w-[940px] w-full divide-y divide-slate-200/80 text-[0.72rem]">
+                    <table class="min-w-[850px] w-full table-fixed divide-y divide-slate-200/80 text-[0.72rem]">
+                        <colgroup>
+                            <col class="w-[266px]">
+                            <col class="w-[156px]">
+                            <col class="w-[96px]">
+                            <col class="w-[100px]">
+                            <col class="w-[70px]">
+                            <col class="w-[100px]">
+                            <col class="w-[68px]">
+                            <col>
+                        </colgroup>
                         <thead class="sticky top-0 z-10 bg-slate-50/95 shadow-[0_1px_0_rgba(226,232,240,0.9)] backdrop-blur">
                             <tr class="text-left text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
                                 <th class="px-2 py-1.5">Obat</th>
                                 <th class="px-1.5 py-1.5">Batch</th>
                                 <th class="px-1 py-1.5">Expired</th>
-                                <th class="px-1 py-1.5 text-right">Harga Dasar</th>
+                                <th class="px-1 py-1.5 text-right">
+                                    <span class="relative right-8">Harga Dasar</span>
+                                </th>
                                 <th class="px-1 py-1.5 text-center" style="width: 4.4rem; min-width: 4.4rem; max-width: 4.4rem;">Markup %</th>
-                                <th class="px-1.5 py-1.5 text-right">Stok Batch</th>
                                 <th class="px-1.5 py-1.5 text-right">Harga Jual</th>
                                 <th class="px-1.5 py-1.5 text-center">Qty</th>
-                                <th class="px-3 py-1.5 text-right">Subtotal</th>
+                                <th class="py-1.5 pl-2 pr-4 text-right">Subtotal</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-200/80 bg-white text-[0.78rem]">
@@ -201,7 +230,8 @@
                                         <input type="hidden" :name="rowIsUsed(row) ? `items[${index}][unit_cost]` : null" :value="row.base_unit_cost">
                                         <input type="hidden" :name="rowIsUsed(row) ? `items[${index}][markup_percentage]` : null" :value="row.markup_percentage">
                                         <input type="hidden" :name="rowIsUsed(row) ? `items[${index}][unit_price]` : null" :value="row.unit_price">
-                                        <p class="min-w-[116px] max-w-[152px] truncate font-semibold text-slate-900" x-text="row.medicine_name" :title="row.medicine_name"></p>
+                                        <input type="hidden" :name="rowIsUsed(row) ? `items[${index}][manual_unit_price]` : null" :value="row.manual_unit_price ? '1' : '0'">
+                                        <p class="w-[250px] max-w-[250px] truncate font-semibold text-slate-900" x-text="row.medicine_name" :title="row.medicine_name"></p>
                                         <p class="mt-0.5 text-[0.68rem] text-slate-500" x-text="`${row.medicine_code} / ${row.principal_name}`"></p>
                                     </td>
 
@@ -211,16 +241,22 @@
                                             @change="handleBatchChange(row)"
                                             class="w-36 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[0.72rem] text-slate-900 shadow-sm transition focus:border-emerald-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
                                         >
-                                            <template x-for="batch in row.batches" :key="batch.id">
-                                                <option :value="String(batch.id)" x-text="batch.label"></option>
+                                            <template x-for="batch in row.batches" :key="`${batch.id}-${stockRevision}`">
+                                                <option
+                                                    :value="String(batch.id)"
+                                                    :selected="String(row.stock_batch_id) === String(batch.id)"
+                                                    :disabled="batchOptionDisabled(row, batch)"
+                                                    x-text="batchOptionLabel(row, batch)"
+                                                ></option>
                                             </template>
                                         </select>
-                                        <p class="mt-0.5 text-[0.68rem] text-slate-500" x-text="`Sisa ${formatQuantity(row.stock_quantity)} ${row.small_unit}`"></p>
                                     </td>
 
                                     <td class="whitespace-nowrap px-1 py-1.5 text-left text-slate-700" x-text="batchExpiryLabel(row)"></td>
 
-                                    <td class="whitespace-nowrap px-1 py-1.5 text-right font-semibold text-slate-700" x-text="currency(row.base_unit_cost)"></td>
+                                    <td class="whitespace-nowrap px-1 py-1.5 text-right font-semibold text-slate-700">
+                                        <span class="relative right-8" x-text="currency(row.base_unit_cost)"></span>
+                                    </td>
 
                                     <td class="px-1 py-1.5 text-center" style="width: 4.4rem; min-width: 4.4rem; max-width: 4.4rem;">
                                         <div class="mx-auto" style="width: 3.2rem; min-width: 3.2rem; max-width: 3.2rem;">
@@ -233,16 +269,18 @@
                                                 style="width: 3.2rem; min-width: 3.2rem; max-width: 3.2rem;"
                                                 @input.debounce.150ms="handleMarkupInput(row)"
                                             >
-                                            <p class="mt-0.5 text-[0.62rem] text-slate-500">persen</p>
                                         </div>
                                     </td>
 
                                     <td class="whitespace-nowrap px-1.5 py-1.5 text-right font-semibold text-slate-900">
-                                        <p x-text="formatQuantity(row.stock_quantity)"></p>
-                                        <p class="mt-0.5 text-[0.68rem] text-slate-500" x-text="row.small_unit"></p>
+                                        <input
+                                            type="text"
+                                            inputmode="decimal"
+                                            :value="row.unit_price_display"
+                                            class="number-input-no-spinner ml-auto block w-[5.5rem] rounded-lg border border-slate-200 bg-slate-50 px-1.5 py-1 text-right text-[0.76rem] font-semibold text-slate-900 shadow-sm transition focus:border-emerald-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                                            @input="handleSellingPriceInput(row, $event)"
+                                        >
                                     </td>
-
-                                    <td class="whitespace-nowrap px-1.5 py-1.5 text-right font-semibold text-slate-900" x-text="currency(row.unit_price)"></td>
 
                                     <td class="px-1.5 py-1.5 text-center">
                                         <input
@@ -256,7 +294,7 @@
                                         >
                                     </td>
 
-                                    <td class="min-w-[5.25rem] whitespace-nowrap px-3 py-1.5 text-right">
+                                    <td class="min-w-[5.25rem] whitespace-nowrap py-1.5 pl-2 pr-4 text-right">
                                         <p class="font-semibold text-slate-900" x-text="currency(row.line_total)"></p>
                                         <p class="mt-0.5 text-[0.68rem] text-slate-500" x-text="row.composition"></p>
                                     </td>

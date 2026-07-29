@@ -7,6 +7,7 @@ use App\Models\Principal;
 use App\Models\PurchaseInvoice;
 use App\Models\PurchaseInvoiceItem;
 use App\Models\StockBatch;
+use App\Models\StorageLocation;
 use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -185,7 +186,7 @@ class PurchaseInvoicePageTest extends TestCase
         $this->assertEquals(1234.56, (float) $invoiceFromView->items->first()->stockBatch->purchase_price);
     }
 
-    public function test_purchase_invoice_form_shows_manual_unit_content_and_total_qty_columns(): void
+    public function test_purchase_invoice_form_shows_manual_unit_content_without_total_qty_and_location_columns(): void
     {
         $user = User::factory()->create();
 
@@ -196,8 +197,62 @@ class PurchaseInvoicePageTest extends TestCase
         $response
             ->assertOk()
             ->assertSee('Isi')
-            ->assertSee('Total Qty')
-            ->assertSee('qty x isi');
+            ->assertDontSee('Total Qty')
+            ->assertDontSee('qty x isi')
+            ->assertDontSee('>Lokasi<', false);
+    }
+
+    public function test_purchase_invoice_can_be_saved_without_batch_and_defaults_expiry_to_today(): void
+    {
+        $user = User::factory()->create();
+        $supplier = Supplier::query()->create([
+            'code' => 'SUP-TANPA-BATCH',
+            'name' => 'PT Supplier Tanpa Batch',
+            'is_active' => true,
+        ]);
+        $medicine = Medicine::query()->create([
+            'code' => 'OBT-TANPA-BATCH',
+            'name' => 'Obat Tanpa Batch',
+            'small_unit' => 'Tablet',
+            'small_unit_per_large_unit' => 1,
+            'is_active' => true,
+        ]);
+        $location = StorageLocation::query()->create([
+            'code' => 'LOC-TANPA-BATCH',
+            'name' => 'Rak Tanpa Batch',
+            'is_active' => true,
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->post(route('pembelian.input-faktur-pembelian.store'), [
+                'invoice_number' => 'INV-TANPA-BATCH',
+                'invoice_date' => now()->toDateString(),
+                'supplier_id' => $supplier->id,
+                'payment_method' => 'cash',
+                'tax_percentage' => 0,
+                'items' => [[
+                    'medicine_id' => $medicine->id,
+                    'storage_location_id' => $location->id,
+                    'batch_number' => '',
+                    'expiry_date' => '',
+                    'quantity' => 10,
+                    'unit_price' => 1000,
+                    'discount_mode' => 'percent',
+                ]],
+            ]);
+
+        $response
+            ->assertRedirect(route('pembelian.input-faktur-pembelian'))
+            ->assertSessionHasNoErrors();
+
+        $invoiceItem = PurchaseInvoiceItem::query()->sole();
+        $stockBatch = StockBatch::query()->sole();
+
+        $this->assertSame('', $invoiceItem->batch_number);
+        $this->assertSame(now()->toDateString(), $invoiceItem->expiry_date?->toDateString());
+        $this->assertSame('', $stockBatch->batch_number);
+        $this->assertSame(now()->toDateString(), $stockBatch->expiry_date?->toDateString());
     }
 
     public function test_purchase_invoice_sets_landed_unit_cost_from_discount_and_tax(): void

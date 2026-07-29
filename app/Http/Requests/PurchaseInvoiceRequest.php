@@ -22,6 +22,7 @@ class PurchaseInvoiceRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
+        $today = now()->toDateString();
         $items = collect($this->input('items', []))
             ->filter(function ($item): bool {
                 if (! is_array($item)) {
@@ -35,6 +36,14 @@ class PurchaseInvoiceRequest extends FormRequest
                 }
 
                 return false;
+            })
+            ->map(function (array $item) use ($today): array {
+                $item['batch_number'] = trim((string) ($item['batch_number'] ?? ''));
+                $item['expiry_date'] = filled($item['expiry_date'] ?? null)
+                    ? $item['expiry_date']
+                    : $today;
+
+                return $item;
             })
             ->values()
             ->all();
@@ -61,7 +70,7 @@ class PurchaseInvoiceRequest extends FormRequest
             'items.*.medicine_id' => ['required', Rule::exists('medicines', 'id')],
             'items.*.storage_location_id' => ['required', Rule::exists('storage_locations', 'id')],
             'items.*.unit_content' => ['nullable', 'numeric', 'gt:0'],
-            'items.*.batch_number' => ['required', 'string', 'max:100'],
+            'items.*.batch_number' => ['nullable', 'string', 'max:100'],
             'items.*.expiry_date' => ['required', 'date'],
             'items.*.quantity' => ['required', 'numeric', 'gt:0'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
@@ -87,7 +96,6 @@ class PurchaseInvoiceRequest extends FormRequest
             'items.*.storage_location_id.required' => 'Lokasi wajib dipilih untuk setiap item obat.',
             'items.*.storage_location_id.exists' => 'Lokasi yang dipilih pada item obat tidak valid.',
             'items.*.unit_content.gt' => 'Isi harus lebih besar dari nol.',
-            'items.*.batch_number.required' => 'No batch wajib diisi untuk setiap item obat.',
             'items.*.expiry_date.required' => 'Tanggal expired wajib diisi untuk setiap item obat.',
             'items.*.quantity.gt' => 'Qty harus lebih besar dari nol.',
         ];

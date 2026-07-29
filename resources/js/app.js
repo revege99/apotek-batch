@@ -510,6 +510,7 @@ document.addEventListener('alpine:init', () => {
 
     Alpine.data('purchaseInvoiceForm', (config = {}, supplierOptions = []) => {
         const medicineCatalog = Array.isArray(config.catalog) ? config.catalog : [];
+        const defaultExpiryDate = config.default_expiry_date ?? '';
 
         return ({
         invoice_number: config.invoice_number ?? '',
@@ -693,7 +694,6 @@ document.addEventListener('alpine:init', () => {
 
         rowReadyForCompanion(row) {
             return String(row.medicine_id ?? '').trim() !== ''
-                && String(row.batch_number ?? '').trim() !== ''
                 && toNumber(row.quantity, 0) > 0;
         },
 
@@ -794,7 +794,7 @@ document.addEventListener('alpine:init', () => {
                 unit_content: row.unit_content,
                 storage_location_id: row.storage_location_id,
                 batch_number: '',
-                expiry_date: '',
+                expiry_date: defaultExpiryDate,
                 quantity: '',
                 unit_price: '',
                 discount_percentage: '',
@@ -1246,6 +1246,9 @@ document.addEventListener('alpine:init', () => {
         nextDynamicRowId: 1,
         autoFillPaidAmount: false,
         paymentModalOpen: false,
+        stockWarning: '',
+        stockWarningTimeout: null,
+        stockRevision: 0,
 
         init() {
             const initialItems = Array.isArray(config.items) ? config.items : [];
@@ -1279,6 +1282,18 @@ document.addEventListener('alpine:init', () => {
             this.syncCustomerSearch();
         },
 
+        parseBooleanValue(value, fallback = false) {
+            if (value === null || typeof value === 'undefined' || String(value).trim() === '') {
+                return fallback;
+            }
+
+            if (typeof value === 'boolean') {
+                return value;
+            }
+
+            return ['1', 'true', 'on', 'yes'].includes(String(value).trim().toLowerCase());
+        },
+
         hydrateRow(item) {
             const batches = Array.isArray(item.batches) ? item.batches : [];
             const fallbackBatchId = item.stock_batch_id ?? (batches[0]?.id ?? '');
@@ -1302,6 +1317,8 @@ document.addEventListener('alpine:init', () => {
                 unit_price: item.unit_price !== undefined && item.unit_price !== null
                     ? String(item.unit_price)
                     : '',
+                unit_price_display: this.formatMoneyInput(item.unit_price ?? ''),
+                manual_unit_price: this.parseBooleanValue(item.manual_unit_price, false),
                 line_total: 0,
                 filled_order: null,
                 group_order: Number(item.group_order ?? 0),
@@ -1415,6 +1432,8 @@ document.addEventListener('alpine:init', () => {
 
             row.markup_percentage = String(markupPercentage);
             row.unit_price = String(unitPrice);
+            row.unit_price_display = this.formatMoneyInput(unitPrice);
+            row.manual_unit_price = false;
         },
 
         applyCustomerPricing() {
@@ -1483,6 +1502,23 @@ document.addEventListener('alpine:init', () => {
         handleMarkupInput(row) {
             this.syncRowPricing(row, 0);
             this.refreshRow(row);
+        },
+
+        handleSellingPriceInput(row, event) {
+            const parsedValue = this.parseMoneyInput(event?.target?.value ?? row.unit_price_display);
+            const unitPrice = roundCurrency(Math.max(toNumber(parsedValue, 0), 0));
+            const baseUnitCost = Math.max(toNumber(row.base_unit_cost, 0), 0);
+            const markupPercentage = baseUnitCost > 0
+                ? roundCurrency(Math.max(((unitPrice - baseUnitCost) / baseUnitCost) * 100, 0))
+                : 0;
+
+            row.unit_price = String(unitPrice);
+            row.unit_price_display = this.formatMoneyInput(unitPrice);
+            row.markup_percentage = String(markupPercentage);
+            row.manual_unit_price = true;
+            event.target.value = row.unit_price_display;
+            this.recalculateRow(row);
+            this.syncPaidAmount();
         },
 
         setSearchTerm(value) {
@@ -1635,21 +1671,123 @@ document.addEventListener('alpine:init', () => {
             return this.selectedBatch(row)?.expiry_label ?? '-';
         },
 
+        showStockWarning(message) {
+            this.stockWarning = message;
+
+            if (this.stockWarningTimeout !== null) {
+                window.clearTimeout(this.stockWarningTimeout);
+            }
+
+            this.stockWarningTimeout = window.setTimeout(() => {
+                this.stockWarning = '';
+                this.stockWarningTimeout = null;
+            }, 5000);
+        },
+
+        normalizedBatchNumber(batch) {
+            return String(batch?.batch_number ?? '')
+                .trim()
+                .toLocaleUpperCase('id-ID');
+        },
+
+        batchIdentity(row, batch) {
+            const explicitGroupKey = String(batch?.group_key ?? '').trim();
+
+            if (explicitGroupKey !== '') {
+                return explicitGroupKey;
+            }
+
+            return `${String(row.medicine_id ?? '')}|${this.normalizedBatchNumber(batch)}`;
+        },
+
+        rowsUsingBatch(row, batch, excludedRowKey = null) {
+            const medicineId = String(row.medicine_id ?? '');
+            const batchIdentity = this.batchIdentity(row, batch);
+
+            if (medicineId === '' || batchIdentity === '|') {
+                return [];
+            }
+
+            return this.rows
+                .filter((candidate) => {
+                    if (candidate.key === excludedRowKey || String(candidate.medicine_id ?? '') !== medicineId) {
+                        return false;
+                    }
+
+                    return this.batchIdentity(candidate, this.selectedBatch(candidate)) === batchIdentity;
+                });
+        },
+
+        usedBatchQuantity(row, batch, excludedRowKey = null) {
+            return this.rowsUsingBatch(row, batch, excludedRowKey)
+                .reduce((total, candidate) => total + Math.max(toNumber(candidate.quantity, 0), 0), 0);
+        },
+
+        batchRemainingQuantity(row, batch) {
+            const initialStock = Math.max(toNumber(batch?.stock_quantity, 0), 0);
+            const usedQuantity = this.usedBatchQuantity(row, batch);
+
+            return Math.max(roundCurrency(initialStock - usedQuantity), 0);
+        },
+
+        batchAvailableForRow(row) {
+            const batch = this.selectedBatch(row);
+
+            if (! batch) {
+                return 0;
+            }
+
+            const initialStock = Math.max(toNumber(batch.stock_quantity, 0), 0);
+            const usedByOtherRows = this.usedBatchQuantity(row, batch, row.key);
+
+            return Math.max(roundCurrency(initialStock - usedByOtherRows), 0);
+        },
+
+        batchOptionLabel(row, batch) {
+            this.stockRevision;
+
+            const batchNumber = this.normalizedBatchNumber(batch);
+            const label = batchNumber !== '' && batchNumber !== '-'
+                ? batch.batch_number
+                : 'Tanpa batch';
+
+            return `${label} / ${numberFormatter.format(this.batchRemainingQuantity(row, batch))} ${row.small_unit}`;
+        },
+
+        batchOptionDisabled(row, batch) {
+            const isSelected = String(row.stock_batch_id ?? '') === String(batch?.id ?? '');
+            const hasCurrentQuantity = toNumber(row.quantity, 0) > 0;
+
+            return this.batchRemainingQuantity(row, batch) <= 0
+                && ! (isSelected && hasCurrentQuantity);
+        },
+
         recalculateRow(row) {
             this.syncBatchSelection(row);
-            const maximum = Math.max(toNumber(row.stock_quantity, 0), 0);
+            const availableQuantity = this.batchAvailableForRow(row);
             const rawQuantity = String(row.quantity ?? '').trim();
 
             if (rawQuantity === '') {
                 row.quantity = '';
                 row.line_total = 0;
+                this.stockRevision += 1;
                 return;
             }
 
-            const safeQuantity = Math.min(Math.max(toNumber(row.quantity, 0), 0), maximum);
+            const requestedQuantity = Math.max(toNumber(row.quantity, 0), 0);
+            const safeQuantity = Math.min(requestedQuantity, availableQuantity);
+
+            if (requestedQuantity > availableQuantity) {
+                const batchNumber = this.selectedBatch(row)?.batch_number ?? 'tanpa batch';
+
+                this.showStockWarning(
+                    `Qty batch ${batchNumber} melebihi stok. Sisa yang dapat dipakai ${numberFormatter.format(availableQuantity)} ${row.small_unit}.`,
+                );
+            }
 
             row.quantity = safeQuantity > 0 ? String(roundCurrency(safeQuantity)) : '';
             row.line_total = roundCurrency(safeQuantity * Math.max(toNumber(row.unit_price, 0), 0));
+            this.stockRevision += 1;
         },
 
         refreshRow(row) {
@@ -1831,10 +1969,22 @@ document.addEventListener('alpine:init', () => {
                 return null;
             }
 
+            const lastUsedRow = [...medicineRows]
+                .reverse()
+                .find((row) => row.key !== excludedRowKey && this.rowIsUsed(row));
+            const lastUsedBatch = lastUsedRow ? this.selectedBatch(lastUsedRow) : null;
+
+            if (lastUsedBatch && this.batchRemainingQuantity(lastUsedRow, lastUsedBatch) > 0) {
+                return lastUsedBatch;
+            }
+
             const usedBatchIds = this.usedBatchIdsForMedicine(medicineId, excludedRowKey);
 
-            return templateRow.batches.find((batch) => ! usedBatchIds.includes(String(batch.id ?? '')))
-                ?? templateRow.batches[0]
+            return templateRow.batches.find((batch) =>
+                ! usedBatchIds.includes(String(batch.id ?? ''))
+                && this.batchRemainingQuantity(templateRow, batch) > 0
+            )
+                ?? templateRow.batches.find((batch) => this.batchRemainingQuantity(templateRow, batch) > 0)
                 ?? null;
         },
 
@@ -1891,11 +2041,18 @@ document.addEventListener('alpine:init', () => {
                 const placeholderRow = this.rowsForMedicine(medicineId).find((row) => ! this.rowReadyForCompanion(row));
                 const preferredBatch = this.preferredBatchForMedicine(medicineId, placeholderRow?.key ?? null);
 
-                if (placeholderRow && preferredBatch) {
+                if (placeholderRow) {
                     const markupPercentage = this.currentMarkup();
+                    const targetBatch = this.canKeepSelectedBatch(medicineId, placeholderRow)
+                        ? this.selectedBatch(placeholderRow)
+                        : preferredBatch;
 
-                    placeholderRow.stock_batch_id = String(preferredBatch.id ?? '');
-                    placeholderRow.stock_quantity = String(preferredBatch.stock_quantity ?? '0');
+                    if (! targetBatch) {
+                        return;
+                    }
+
+                    placeholderRow.stock_batch_id = String(targetBatch.id ?? '');
+                    placeholderRow.stock_quantity = String(targetBatch.stock_quantity ?? '0');
                     placeholderRow.markup_percentage = String(markupPercentage);
                     this.syncRowPricing(placeholderRow, markupPercentage);
                     placeholderRow.line_total = 0;

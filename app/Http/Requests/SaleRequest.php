@@ -68,6 +68,7 @@ class SaleRequest extends FormRequest
             'items.*.unit_cost' => ['required', 'numeric', 'min:0'],
             'items.*.markup_percentage' => ['required', 'numeric', 'min:0'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+            'items.*.manual_unit_price' => ['nullable', 'boolean'],
         ];
     }
 

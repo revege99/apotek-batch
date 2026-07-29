@@ -533,12 +533,6 @@ class SaleController extends Controller
             ->filter(fn ($item): bool => is_array($item) && isset($item['medicine_id']))
             ->values();
 
-        $stockMap = StockBatch::query()
-            ->selectRaw('medicine_id, COALESCE(SUM(quantity_balance), 0) as total_stock')
-            ->where('quantity_balance', '>', 0)
-            ->groupBy('medicine_id')
-            ->pluck('total_stock', 'medicine_id');
-
         $batchMap = StockBatch::query()
             ->where('quantity_balance', '>', 0)
             ->orderByRaw('CASE WHEN expiry_date IS NULL THEN 1 ELSE 0 END')
@@ -560,9 +554,9 @@ class SaleController extends Controller
             ->where('is_active', true)
             ->orderBy('name')
             ->get()
-            ->filter(fn (Medicine $medicine): bool => (float) ($stockMap[$medicine->id] ?? 0) > 0 && ($batchMap[$medicine->id] ?? collect())->isNotEmpty())
+            ->filter(fn (Medicine $medicine): bool => ($batchMap[$medicine->id] ?? collect())->isNotEmpty())
             ->values()
-            ->map(function (Medicine $medicine, int $groupOrder) use ($stockMap, $batchMap): array {
+            ->map(function (Medicine $medicine, int $groupOrder) use ($batchMap): array {
                 /** @var Collection<int, StockBatch> $stockBatches */
                 $stockBatches = $batchMap[$medicine->id] ?? collect();
                 $batches = $this->groupedSaleBatchOptions($stockBatches, $medicine->small_unit ?: 'unit');
@@ -580,7 +574,7 @@ class SaleController extends Controller
                     'small_unit' => $medicine->small_unit ?: 'unit',
                     'stock_batch_id' => (string) ($defaultBatch['id'] ?? ''),
                     'base_unit_cost' => (string) $baseUnitCost,
-                    'stock_quantity' => (string) round((float) ($defaultBatch['stock_quantity'] ?? ($stockMap[$medicine->id] ?? 0)), 2),
+                    'stock_quantity' => (string) round((float) ($defaultBatch['stock_quantity'] ?? 0), 2),
                     'quantity' => '',
                     'batches' => $batches->values()->all(),
                 ];
@@ -620,6 +614,7 @@ class SaleController extends Controller
                 'unit_price' => array_key_exists('unit_price', $oldItem)
                     ? (string) $oldItem['unit_price']
                     : null,
+                'manual_unit_price' => (string) ($oldItem['manual_unit_price'] ?? '0'),
             ];
 
             $usedMedicineIds[$medicineId] = true;
@@ -691,6 +686,7 @@ class SaleController extends Controller
                     'unit_price' => array_key_exists('unit_price', $item)
                         ? (string) $item['unit_price']
                         : $baseRow['unit_price'],
+                    'manual_unit_price' => (string) ($item['manual_unit_price'] ?? '0'),
                 ];
             })->filter()->values()->all()
             : $baseRows->values()->all();
@@ -730,11 +726,18 @@ class SaleController extends Controller
     private function editRowsFromSale(Sale $sale): Collection
     {
         return $sale->items
+            ->groupBy(fn (SaleItem $item): string => implode('|', [
+                (int) $item->medicine_id,
+                Str::upper(trim((string) $item->batch_number_snapshot)),
+            ]))
             ->values()
-            ->map(function (SaleItem $item, int $index): array {
+            ->map(function (Collection $groupedItems, int $index): array {
+                /** @var SaleItem $item */
+                $item = $groupedItems->first();
                 $medicine = $item->medicine;
                 $smallUnit = $medicine?->small_unit ?: 'unit';
                 $batchNumber = trim((string) $item->batch_number_snapshot);
+                $quantity = round((float) $groupedItems->sum('quantity'), 2);
                 $groupKey = implode('|', [
                     (int) $item->medicine_id,
                     Str::upper($batchNumber),
@@ -751,18 +754,23 @@ class SaleController extends Controller
                     'small_unit' => $smallUnit,
                     'stock_batch_id' => $groupKey,
                     'base_unit_cost' => (string) round((float) $item->unit_cost, 2),
-                    'stock_quantity' => (string) round((float) $item->quantity, 2),
-                    'quantity' => (string) round((float) $item->quantity, 2),
+                    'stock_quantity' => (string) $quantity,
+                    'quantity' => (string) $quantity,
                     'markup_percentage' => (string) round((float) $item->markup_percentage, 2),
                     'unit_price' => (string) round((float) $item->unit_price, 2),
                     'batches' => [[
                         'id' => $groupKey,
+                        'group_key' => $groupKey,
                         'batch_number' => $batchNumber !== '' ? $batchNumber : '-',
                         'expiry_date' => $item->expiry_date_snapshot?->format('Y-m-d') ?? '',
-                        'expiry_label' => $item->expiry_date_snapshot?->translatedFormat('d M Y') ?? '-',
-                        'stock_quantity' => (string) round((float) $item->quantity, 2),
-                        'stock_batch_ids' => [(string) $item->stock_batch_id],
-                        'label' => trim(($batchNumber !== '' ? $batchNumber : 'Tanpa batch').' / '.$this->formatQuantity((float) $item->quantity).' '.$smallUnit),
+                        'expiry_label' => $this->collapseSaleBatchDates($groupedItems->pluck('expiry_date_snapshot')),
+                        'stock_quantity' => (string) $quantity,
+                        'stock_batch_ids' => $groupedItems
+                            ->pluck('stock_batch_id')
+                            ->map(fn ($id): string => (string) $id)
+                            ->values()
+                            ->all(),
+                        'label' => trim(($batchNumber !== '' ? $batchNumber : 'Tanpa batch').' / '.$this->formatQuantity($quantity).' '.$smallUnit),
                         'sort_expiry' => $item->expiry_date_snapshot?->toDateString() ?? '9999-12-31',
                         'sort_batch' => Str::lower($batchNumber),
                     ]],
@@ -817,10 +825,11 @@ class SaleController extends Controller
         $remainingQuantities = $stockBatches
             ->flatten(1)
             ->mapWithKeys(fn (StockBatch $batch): array => [$batch->id => round((float) $batch->quantity_balance, 2)]);
+        $requestedQuantities = [];
 
         return collect($items)
             ->values()
-            ->flatMap(function (array $item) use ($medicines, $stockBatches, $batchGroupByBatchId, $remainingQuantities, $defaultMarkupPercentage): array {
+            ->flatMap(function (array $item) use ($medicines, $stockBatches, $batchGroupByBatchId, &$remainingQuantities, &$requestedQuantities, $defaultMarkupPercentage): array {
                 /** @var Medicine|null $medicine */
                 $medicine = $medicines->get((int) $item['medicine_id']);
 
@@ -845,6 +854,24 @@ class SaleController extends Controller
                     throw new RuntimeException('Qty jual harus lebih besar dari nol.');
                 }
 
+                $batchGroupKey = $this->saleBatchGroupKey($selectedBatchGroup->first());
+                $batchTotalStock = round((float) $selectedBatchGroup->sum('quantity_balance'), 2);
+                $requestedBatchQuantity = round(
+                    (float) ($requestedQuantities[$batchGroupKey] ?? 0) + $quantity,
+                    2
+                );
+
+                if ($requestedBatchQuantity > $batchTotalStock + 0.001) {
+                    $batchNumber = trim((string) ($selectedBatchGroup->first()?->batch_number ?? ''));
+
+                    throw new RuntimeException(
+                        'Total qty batch '.($batchNumber !== '' ? $batchNumber : 'tanpa batch').' untuk obat '.$medicine->name
+                        .' melebihi stok '.$this->formatQuantity($batchTotalStock).'.'
+                    );
+                }
+
+                $requestedQuantities[$batchGroupKey] = $requestedBatchQuantity;
+
                 $availableStock = round((float) $selectedBatchGroup->sum(
                     fn (StockBatch $stockBatch): float => (float) ($remainingQuantities[$stockBatch->id] ?? 0)
                 ), 2);
@@ -859,7 +886,10 @@ class SaleController extends Controller
 
                 $pricingBase = round($this->baseUnitCost($medicine), 2);
                 $markupPercentage = round(max((float) ($item['markup_percentage'] ?? $defaultMarkupPercentage), 0), 2);
-                $unitPrice = round($pricingBase + ($pricingBase * $markupPercentage / 100), 2);
+                $calculatedUnitPrice = round($pricingBase + ($pricingBase * $markupPercentage / 100), 2);
+                $unitPrice = filter_var($item['manual_unit_price'] ?? false, FILTER_VALIDATE_BOOL)
+                    ? round(max((float) ($item['unit_price'] ?? 0), 0), 2)
+                    : $calculatedUnitPrice;
                 $remainingQuantity = $quantity;
                 $allocations = [];
 
@@ -1268,6 +1298,7 @@ class SaleController extends Controller
 
                 return [
                     'id' => $groupKey,
+                    'group_key' => $groupKey,
                     'batch_number' => $batchNumber !== '' ? $batchNumber : '-',
                     'expiry_date' => $firstBatch?->expiry_date?->format('Y-m-d') ?? '',
                     'expiry_label' => $this->collapseSaleBatchDates($groupedBatches->pluck('expiry_date'), 'd/m/Y'),

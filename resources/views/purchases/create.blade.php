@@ -127,33 +127,45 @@
                 </div>
             </section>
 
-            <section class="panel-surface rounded-[1.2rem] flex min-h-0 flex-1 flex-col overflow-hidden p-0">
+            <section class="panel-surface flex min-h-0 flex-1 flex-col overflow-hidden p-0" style="border-radius: 0;">
                 <div class="min-h-0 flex-1 overflow-auto">
-                    <table class="min-w-[1090px] w-full divide-y divide-slate-200/80 text-[0.72rem]">
+                    <table class="min-w-[930px] w-full table-fixed divide-y divide-slate-200/80 text-[0.72rem]">
+                        <colgroup>
+                            <col class="w-[266px]">
+                            <col class="w-[76px]">
+                            <col class="w-[56px]">
+                            <col class="w-[96px]">
+                            <col class="w-[124px]">
+                            <col class="w-[64px]">
+                            <col class="w-[96px]">
+                            <col class="w-[28px]">
+                            <col class="w-[58px]">
+                            <col class="w-[100px]">
+                            <col>
+                        </colgroup>
                         <thead class="sticky top-0 z-10 bg-slate-50/95 shadow-[0_1px_0_rgba(226,232,240,0.9)] backdrop-blur">
                             <tr class="text-left text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                                <th class="px-2 py-1.5">Obat</th>
+                                <th class="w-[266px] min-w-[266px] max-w-[266px] px-2 py-1.5">Obat</th>
                                 <th class="px-2 py-1.5">Satuan</th>
                                 <th class="px-1 py-1.5 text-center">Isi</th>
-                                <th class="px-1 py-1.5 text-center">Total Qty</th>
                                 <th class="px-2 py-1.5 text-center">Batch</th>
                                 <th class="px-0.5 py-1.5 text-center">Expired</th>
-                                <th class="px-0.5 py-1.5 text-center">Lokasi</th>
                                 <th class="px-0.5 py-1.5 text-center">Qty</th>
                                 <th class="px-0.5 py-1.5 text-center">Harga</th>
                                 <th class="px-0.5 py-1.5 text-center" title="Update harga beli master obat">U</th>
                                 <th class="px-0.5 py-1.5 text-center">Disc %</th>
                                 <th class="px-0.5 py-1.5 text-center">Disc Rp</th>
-                                <th class="px-2 py-1.5 text-right">Jumlah</th>
+                                <th class="py-1.5 pl-2 pr-4 text-right">Jumlah</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-200/80 bg-white text-[0.78rem]">
                             <template x-for="(row, index) in displayRows()" :key="row.key">
                                 <tr class="align-middle" :class="{ 'bg-emerald-50/30': rowIsUsed(row) }">
-                                    <td class="px-2 py-1.5">
+                                    <td class="w-[266px] min-w-[266px] max-w-[266px] px-2 py-1.5">
                                         <input type="hidden" :name="rowIsUsed(row) ? `items[${rows.indexOf(row)}][medicine_id]` : null" :value="row.medicine_id">
                                         <input type="hidden" :name="rowIsUsed(row) ? `items[${rows.indexOf(row)}][discount_mode]` : null" :value="row.discount_mode">
-                                        <p class="min-w-[130px] max-w-[170px] truncate font-semibold text-slate-900" x-text="row.medicine_name" :title="row.medicine_name"></p>
+                                        <input type="hidden" :name="rowIsUsed(row) ? `items[${rows.indexOf(row)}][storage_location_id]` : null" :value="row.storage_location_id">
+                                        <p class="w-[250px] max-w-[250px] truncate font-semibold text-slate-900" x-text="row.medicine_name" :title="row.medicine_name"></p>
                                         <p class="mt-0.5 text-[0.68rem] text-slate-500" x-text="row.medicine_code"></p>
                                     </td>
 
@@ -173,17 +185,12 @@
                                         >
                                     </td>
 
-                                    <td class="px-1 py-1.5 text-center">
-                                        <p class="font-semibold text-slate-900" x-text="formatQuantity(row.stock_quantity)"></p>
-                                        <p class="mt-0.5 text-[0.66rem] text-slate-400">qty x isi</p>
-                                    </td>
-
                                     <td class="px-2 py-1.5 text-center">
                                         <input
                                             :name="rowIsUsed(row) ? `items[${rows.indexOf(row)}][batch_number]` : null"
                                             type="text"
                                             x-model="row.batch_number"
-                                            placeholder="No batch"
+                                            placeholder="Opsional"
                                             class="ui-control purchase-detail-control mx-auto block w-20 rounded-lg px-2 text-center text-[0.78rem] uppercase placeholder:text-[0.68rem]"
                                             @input.debounce.150ms="handleBatchInput(row)"
                                         >
@@ -197,20 +204,6 @@
                                             class="ui-control purchase-detail-control mx-auto block w-[7rem] rounded-lg px-1.5 text-center text-[0.72rem]"
                                             @input.debounce.150ms="handleRowMetaInput(row)"
                                         >
-                                    </td>
-
-                                    <td class="px-0.5 py-1.5 text-center">
-                                        <select
-                                            :name="rowIsUsed(row) ? `items[${rows.indexOf(row)}][storage_location_id]` : null"
-                                            x-model="row.storage_location_id"
-                                            class="ui-select-control purchase-detail-control mx-auto block w-[4.9rem] rounded-lg px-1 text-center text-[0.72rem]"
-                                            @change="handleRowMetaInput(row)"
-                                        >
-                                            <option value="">Pilih lokasi</option>
-                                            @foreach ($locationOptions as $location)
-                                                <option value="{{ $location->id }}">{{ $location->name }}</option>
-                                            @endforeach
-                                        </select>
                                     </td>
 
                                     <td class="px-0.5 py-1.5 text-center">
@@ -284,7 +277,7 @@
                                         >
                                     </td>
 
-                                    <td class="min-w-[7.5rem] whitespace-nowrap px-2 py-1.5 text-right">
+                                    <td class="min-w-[5.5rem] whitespace-nowrap py-1.5 pl-2 pr-4 text-right">
                                         <p class="font-semibold text-slate-900" x-text="currency(row.gross_total)"></p>
                                     </td>
                                 </tr>
