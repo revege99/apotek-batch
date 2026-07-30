@@ -83,6 +83,11 @@ class PurchaseInvoice extends Model
         return $this->hasMany(PurchaseReturn::class);
     }
 
+    public function supplierPaymentAllocations(): HasMany
+    {
+        return $this->hasMany(SupplierPaymentAllocation::class);
+    }
+
     /**
      * Get the creator for this invoice.
      */

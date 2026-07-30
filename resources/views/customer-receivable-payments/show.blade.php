@@ -6,7 +6,7 @@
                 <span class="text-slate-300">/</span>
                 <a href="{{ route('keuangan.riwayat-pembayaran') }}" class="text-slate-500 transition hover:text-emerald-700">{{ $page['label'] }}</a>
                 <span class="text-slate-300">/</span>
-                <span class="text-slate-600">Detail Pembayaran</span>
+                <span class="text-slate-600">Riwayat Faktur</span>
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
@@ -85,8 +85,8 @@
                     <span class="font-semibold text-slate-900">{{ $detail['customer_name'] }}</span>
                 </div>
                 <div class="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-[0.78rem] text-slate-700">
-                    <span class="font-medium">Jumlah bayar</span>
-                    <span class="font-semibold text-slate-900">{{ $detail['payment_count'] }}</span>
+                    <span class="font-medium">Jumlah faktur</span>
+                    <span class="font-semibold text-slate-900">{{ $detail['invoice_count'] }}</span>
                 </div>
                 <div class="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-[0.78rem] text-slate-700">
                     <span class="font-medium">Total pembayaran</span>
@@ -101,16 +101,16 @@
 
         <section class="panel-surface overflow-hidden p-0">
             <div class="border-b border-slate-200/80 px-5 py-4">
-                <h3 class="section-title">Daftar pembayaran piutang</h3>
+                <h3 class="section-title">Daftar riwayat faktur piutang</h3>
             </div>
 
             <div class="overflow-x-auto">
                 <table class="min-w-[960px] w-full divide-y divide-slate-200/80 text-[0.76rem]">
                     <thead class="bg-slate-50/90 text-left text-[0.66rem] font-semibold uppercase tracking-[0.14em] text-slate-400">
                         <tr>
-                            <th class="px-3 py-3">No Bayar</th>
                             <th class="px-3 py-3">No Faktur</th>
                             <th class="px-3 py-3">Tanggal Faktur</th>
+                            <th class="px-3 py-3">No Bayar</th>
                             <th class="px-3 py-3">Tgl Bayar</th>
                             <th class="px-3 py-3">Metode</th>
                             <th class="px-3 py-3 text-right">Total</th>
@@ -120,12 +120,12 @@
                     <tbody class="divide-y divide-slate-200/80 bg-white">
                         @forelse ($detail['payments'] as $payment)
                             <tr>
+                                <td class="px-3 py-3 font-semibold text-slate-900">{{ $payment['sale_number'] }}</td>
+                                <td class="px-3 py-3 text-slate-700">{{ $payment['sale_date'] }}</td>
                                 <td class="px-3 py-3">
                                     <p class="font-semibold text-slate-900">{{ $payment['payment_number'] }}</p>
                                     <p class="mt-1 text-[0.66rem] text-slate-400">{{ $payment['reference_number'] }}</p>
                                 </td>
-                                <td class="px-3 py-3 text-slate-700">{{ $payment['sale_number'] }}</td>
-                                <td class="px-3 py-3 text-slate-700">{{ $payment['sale_date'] }}</td>
                                 <td class="px-3 py-3 text-slate-700">{{ $payment['payment_date'] }}</td>
                                 <td class="px-3 py-3">
                                     <span class="inline-flex rounded-full border border-sky-100 bg-sky-50 px-2.5 py-1 text-[0.66rem] font-semibold uppercase tracking-[0.14em] text-sky-700">{{ $payment['payment_method'] }}</span>
@@ -137,14 +137,14 @@
                                             type="button"
                                             @click='openDetail(@json($payment))'
                                             class="table-icon-btn"
-                                            title="Detail obat {{ $payment['sale_number'] }}"
-                                            aria-label="Detail obat {{ $payment['sale_number'] }}"
+                                            title="Lihat detail barang faktur {{ $payment['sale_number'] }}"
+                                            aria-label="Lihat detail barang faktur {{ $payment['sale_number'] }}"
                                         >
                                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
                                                 <path d="M2.06 12.35a1 1 0 0 1 0-.7C3.2 8.38 6.52 5 12 5s8.8 3.38 9.94 6.65a1 1 0 0 1 0 .7C20.8 15.62 17.48 19 12 19s-8.8-3.38-9.94-6.65Z" />
                                                 <circle cx="12" cy="12" r="3" />
                                             </svg>
-                                            <span class="sr-only">Detail obat</span>
+                                            <span class="sr-only">Detail barang faktur</span>
                                         </button>
 
                                         <button
@@ -201,7 +201,7 @@
                     <div class="border-b border-sky-100 bg-gradient-to-br from-sky-50 via-white to-slate-50 px-4 py-4 sm:px-5">
                         <div class="flex items-start justify-between gap-4">
                             <div>
-                                <p class="text-[0.66rem] font-semibold uppercase tracking-[0.18em] text-sky-500">Detail Obat Faktur</p>
+                                <p class="text-[0.66rem] font-semibold uppercase tracking-[0.18em] text-sky-500">Detail Barang Faktur</p>
                                 <h3 class="mt-1 text-sm font-semibold text-slate-950 sm:text-base" x-text="detailTarget?.sale_number"></h3>
                                 <p class="mt-1 text-[0.72rem] leading-5 text-slate-600">
                                     Pembayaran
@@ -209,7 +209,7 @@
                                 </p>
                             </div>
 
-                            <button type="button" class="table-icon-btn" @click="closeDetail()" aria-label="Tutup detail obat">
+                            <button type="button" class="table-icon-btn" @click="closeDetail()" aria-label="Tutup detail barang">
                                 <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
                                     <path d="M6 6l12 12M18 6 6 18" />
                                 </svg>

@@ -97,6 +97,7 @@
                             <div class="relative min-w-0 flex-1" @click.outside="closeCustomerDropdown()">
                                 <input type="hidden" name="customer_id" :value="customer_id">
                                 <input
+                                    x-ref="customerSearchInput"
                                     id="customer_search"
                                     type="search"
                                     x-model="customerSearch"
@@ -199,7 +200,7 @@
                     <table class="min-w-[850px] w-full table-fixed divide-y divide-slate-200/80 text-[0.72rem]">
                         <colgroup>
                             <col class="w-[266px]">
-                            <col class="w-[156px]">
+                            <col class="w-[172px]">
                             <col class="w-[96px]">
                             <col class="w-[100px]">
                             <col class="w-[70px]">
@@ -278,6 +279,9 @@
                                             inputmode="decimal"
                                             :value="row.unit_price_display"
                                             class="number-input-no-spinner ml-auto block w-[5.5rem] rounded-lg border border-slate-200 bg-slate-50 px-1.5 py-1 text-right text-[0.76rem] font-semibold text-slate-900 shadow-sm transition focus:border-emerald-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                                            :class="{ 'cursor-not-allowed opacity-55': ! hasSelectedCustomer() }"
+                                            :readonly="! hasSelectedCustomer()"
+                                            @pointerdown="if (! hasSelectedCustomer()) { $event.preventDefault(); requireCustomer(); }"
                                             @input="handleSellingPriceInput(row, $event)"
                                         >
                                     </td>
@@ -290,6 +294,9 @@
                                             step="0.01"
                                             x-model="row.quantity"
                                             class="number-input-no-spinner mx-auto block w-14 rounded-lg border border-slate-200 bg-slate-50 px-1.5 py-1 text-center text-[0.78rem] text-slate-900 shadow-sm transition focus:border-emerald-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                                            :class="{ 'cursor-not-allowed opacity-55': ! hasSelectedCustomer() }"
+                                            :readonly="! hasSelectedCustomer()"
+                                            @pointerdown="if (! hasSelectedCustomer()) { $event.preventDefault(); requireCustomer(); }"
                                             @input.debounce.150ms="refreshRow(row)"
                                         >
                                     </td>

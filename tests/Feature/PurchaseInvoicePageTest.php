@@ -45,7 +45,8 @@ class PurchaseInvoicePageTest extends TestCase
             ])
             ->assertSessionHas('toast', fn ($toast): bool => is_array($toast)
                 && ($toast['type'] ?? null) === 'error'
-                && ($toast['message'] ?? null) === 'Periksa kembali input faktur pembelian. Masih ada data yang perlu diperbaiki.');
+                && str_contains((string) ($toast['message'] ?? ''), 'Faktur pembelian belum dapat disimpan')
+                && in_array('Nomor faktur wajib diisi.', $toast['details'] ?? [], true));
     }
 
     public function test_purchase_history_defaults_to_today_and_paginates_thirty_rows(): void

@@ -5,7 +5,8 @@
 @if (is_array($toast) && filled($toast['message'] ?? null))
     @php
         $type = $toast['type'] ?? 'success';
-        $duration = $type === 'error' ? 7000 : 3600;
+        $details = collect($toast['details'] ?? [])->filter()->values();
+        $duration = $type === 'error' ? ($details->isNotEmpty() ? 12000 : 7000) : 3600;
         $styles = match ($type) {
             'error' => [
                 'ring' => 'border-rose-200 bg-white text-rose-950',
@@ -57,6 +58,16 @@
                 <p class="mt-1 text-sm leading-6 text-slate-600">
                     {{ $toast['message'] }}
                 </p>
+                @if ($details->isNotEmpty())
+                    <ul class="mt-2 space-y-1 text-[0.76rem] leading-5 text-rose-700">
+                        @foreach ($details as $detail)
+                            <li class="flex items-start gap-2">
+                                <span class="mt-[0.45rem] h-1 w-1 shrink-0 rounded-full bg-rose-400"></span>
+                                <span>{{ $detail }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
             </div>
 
             <button

@@ -89,15 +89,7 @@ class SaleController extends Controller
         $dateFrom = trim((string) $request->query('date_from', $today));
         $dateTo = trim((string) $request->query('date_to', $today));
 
-        $sales = Sale::query()
-            ->with([
-                'customer:id,name',
-                'customerGroup:id,name,markup_percentage',
-                'customerPayments:id,sale_id,payment_date,amount_paid',
-                'items' => fn ($query) => $query
-                    ->with(['medicine:id,code,name,small_unit'])
-                    ->orderBy('id'),
-            ])
+        $filteredSalesQuery = Sale::query()
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($saleQuery) use ($search) {
                     $saleQuery
@@ -116,7 +108,17 @@ class SaleController extends Controller
                 });
             })
             ->when($dateFrom !== '', fn ($query) => $query->whereDate('sale_date', '>=', $dateFrom))
-            ->when($dateTo !== '', fn ($query) => $query->whereDate('sale_date', '<=', $dateTo))
+            ->when($dateTo !== '', fn ($query) => $query->whereDate('sale_date', '<=', $dateTo));
+
+        $sales = (clone $filteredSalesQuery)
+            ->with([
+                'customer:id,name',
+                'customerGroup:id,name,markup_percentage',
+                'customerPayments:id,sale_id,payment_date,amount_paid',
+                'items' => fn ($query) => $query
+                    ->with(['medicine:id,code,name,small_unit'])
+                    ->orderBy('id'),
+            ])
             ->latest('sale_date')
             ->latest('id')
             ->paginate(12)
@@ -137,9 +139,9 @@ class SaleController extends Controller
             'dateTo' => $dateTo,
             'detailPayloads' => $this->detailPayloads($sales),
             'stats' => [
-                'total' => Sale::query()->count(),
-                'today' => Sale::query()->whereDate('sale_date', now()->toDateString())->count(),
-                'grand_total' => (float) Sale::query()->sum('grand_total'),
+                'total' => (clone $filteredSalesQuery)->count(),
+                'today' => (clone $filteredSalesQuery)->whereDate('sale_date', $today)->count(),
+                'grand_total' => (float) (clone $filteredSalesQuery)->sum('grand_total'),
             ],
         ]);
     }
@@ -178,7 +180,7 @@ class SaleController extends Controller
             'pharmacyAddressLine' => $this->pharmacyAddressLine($profile),
         ])->setPaper('a4');
 
-        return $pdf->download('penjualan-'.$sale->sale_number.'.pdf');
+        return $pdf->stream('penjualan-'.$sale->sale_number.'.pdf');
     }
 
     /**
@@ -506,16 +508,14 @@ class SaleController extends Controller
                 $lockedSale->delete();
             });
         } catch (RuntimeException $exception) {
-            return redirect()
-                ->route('penjualan.data-penjualan')
+            return back()
                 ->with('toast', [
                     'type' => 'error',
                     'message' => $exception->getMessage(),
                 ]);
         }
 
-        return redirect()
-            ->route('penjualan.data-penjualan')
+        return back()
             ->with('toast', [
                 'type' => 'success',
                 'message' => 'Transaksi penjualan '.$saleNumber.' berhasil dihapus dan stok dikembalikan.',

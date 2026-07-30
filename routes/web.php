@@ -26,6 +26,7 @@ use App\Http\Controllers\StorageRackController;
 use App\Http\Controllers\StockController;
 use App\Http\Controllers\StorageLocationController;
 use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\SupplierPayableController;
 use App\Http\Controllers\InternalBillingController;
 use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\UserAccessController;
@@ -75,6 +76,8 @@ $modulePages = collect(config('apotik.navigation'))
                 'stok-batch.stok-opname',
                 'stok-batch.penyesuaian-stok',
                 'keuangan.piutang-pelanggan',
+                'keuangan.pembayaran-hutang',
+                'keuangan.riwayat-pembayaran-hutang',
                 'keuangan.riwayat-pembayaran',
                 'keuangan.riwayat-tagihan-internal',
                 'laporan.laporan-pembelian',
@@ -216,6 +219,12 @@ Route::middleware(['auth', 'verified', 'menu.access'])->group(function () use ($
     Route::get('/keuangan/riwayat-pembayaran/{customer}', [CustomerReceivableController::class, 'historyShow'])->name('keuangan.riwayat-pembayaran.show');
     Route::get('/keuangan/riwayat-pembayaran/{customer}/print', [CustomerReceivableController::class, 'printPaymentHistory'])->name('keuangan.riwayat-pembayaran.print');
     Route::delete('/keuangan/riwayat-pembayaran/{customerPayment}', [CustomerReceivableController::class, 'destroyPayment'])->name('keuangan.riwayat-pembayaran.destroy');
+    Route::get('/keuangan/pembayaran-hutang', [SupplierPayableController::class, 'index'])->name('keuangan.pembayaran-hutang');
+    Route::get('/keuangan/pembayaran-hutang/{supplier}', [SupplierPayableController::class, 'show'])->name('keuangan.pembayaran-hutang.show');
+    Route::post('/keuangan/pembayaran-hutang/{purchaseInvoice}/bayar', [SupplierPayableController::class, 'storePayment'])->name('keuangan.pembayaran-hutang.bayar');
+    Route::get('/keuangan/riwayat-pembayaran-hutang', [SupplierPayableController::class, 'history'])->name('keuangan.riwayat-pembayaran-hutang');
+    Route::get('/keuangan/riwayat-pembayaran-hutang/{supplier}', [SupplierPayableController::class, 'historyShow'])->name('keuangan.riwayat-pembayaran-hutang.show');
+    Route::delete('/keuangan/riwayat-pembayaran-hutang/pembayaran/{supplierPayment}', [SupplierPayableController::class, 'destroyPayment'])->name('keuangan.riwayat-pembayaran-hutang.destroy');
     Route::get('/keuangan/riwayat-tagihan-internal', [InternalBillingController::class, 'index'])->name('keuangan.riwayat-tagihan-internal');
     Route::post('/keuangan/riwayat-tagihan-internal/dokumen/{stockOpname}/bayar', [InternalBillingController::class, 'storeDocumentPayment'])->name('keuangan.riwayat-tagihan-internal.bayar-dokumen');
     Route::post('/keuangan/riwayat-tagihan-internal/{stockAdjustmentRecovery}/bayar', [InternalBillingController::class, 'storePayment'])->name('keuangan.riwayat-tagihan-internal.bayar');

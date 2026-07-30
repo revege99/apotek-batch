@@ -206,7 +206,9 @@ class CustomerReceivableController extends Controller
             'dateFrom' => $dateFrom,
             'dateTo' => $dateTo,
             'stats' => [
-                'total' => $this->customerPaymentBaseQuery($search, $dateFrom, $dateTo)->count(),
+                'total' => $this->customerPaymentBaseQuery($search, $dateFrom, $dateTo)
+                    ->distinct('sale_id')
+                    ->count('sale_id'),
                 'total_amount' => (float) $this->customerPaymentBaseQuery($search, $dateFrom, $dateTo)->sum('amount_paid'),
             ],
         ]);
@@ -352,7 +354,7 @@ class CustomerReceivableController extends Controller
             ->selectRaw('
                 customer_payments.customer_id,
                 customers.name as customer_name,
-                COUNT(customer_payments.id) as payment_count,
+                COUNT(DISTINCT customer_payments.sale_id) as invoice_count,
                 COALESCE(SUM(customer_payments.amount_paid), 0) as total_amount
             ')
             ->groupBy('customer_payments.customer_id', 'customers.name')
@@ -499,7 +501,7 @@ class CustomerReceivableController extends Controller
 
         return [
             'customer_name' => $customer->name ?: '-',
-            'payment_count' => number_format($payments->count()),
+            'invoice_count' => number_format($paymentRows->pluck('sale_id')->filter()->unique()->count()),
             'total_amount' => $this->formatCurrency((float) $paymentRows->sum('amount_paid')),
             'print_url' => route('keuangan.riwayat-pembayaran.print', [
                 'customer' => $customer->id,

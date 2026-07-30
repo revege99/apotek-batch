@@ -29,7 +29,7 @@ class PurchaseInvoiceRequest extends FormRequest
                     return false;
                 }
 
-                foreach (['batch_number', 'expiry_date', 'quantity', 'unit_price', 'discount_percentage', 'discount_amount'] as $field) {
+                foreach (['batch_number', 'quantity', 'unit_price', 'discount_percentage', 'discount_amount'] as $field) {
                     if (array_key_exists($field, $item) && $item[$field] !== null && $item[$field] !== '') {
                         return true;
                     }
@@ -89,15 +89,34 @@ class PurchaseInvoiceRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'invoice_number.required' => 'Nomor faktur wajib diisi.',
+            'invoice_number.unique' => 'Nomor faktur sudah pernah digunakan.',
+            'invoice_date.required' => 'Tanggal faktur wajib diisi.',
+            'invoice_date.date' => 'Tanggal faktur tidak valid.',
+            'supplier_id.required' => 'Supplier wajib dipilih.',
+            'supplier_id.exists' => 'Supplier yang dipilih tidak valid.',
             'payment_method.required' => 'Tentukan status pembayaran faktur terlebih dahulu.',
+            'payment_method.in' => 'Metode pembayaran faktur tidak valid.',
+            'tax_percentage.required' => 'Persentase PPN wajib diisi.',
+            'tax_percentage.numeric' => 'Persentase PPN harus berupa angka.',
+            'tax_percentage.max' => 'Persentase PPN maksimal 100%.',
             'items.required' => 'Tambahkan minimal satu item obat pada faktur pembelian.',
             'items.min' => 'Tambahkan minimal satu item obat pada faktur pembelian.',
             'items.*.medicine_id.required' => 'Pilih obat terlebih dahulu pada setiap baris item.',
+            'items.*.medicine_id.exists' => 'Salah satu obat yang dipilih tidak valid.',
             'items.*.storage_location_id.required' => 'Lokasi wajib dipilih untuk setiap item obat.',
             'items.*.storage_location_id.exists' => 'Lokasi yang dipilih pada item obat tidak valid.',
             'items.*.unit_content.gt' => 'Isi harus lebih besar dari nol.',
+            'items.*.batch_number.max' => 'Nomor batch maksimal 100 karakter.',
             'items.*.expiry_date.required' => 'Tanggal expired wajib diisi untuk setiap item obat.',
+            'items.*.expiry_date.date' => 'Salah satu tanggal expired tidak valid.',
+            'items.*.quantity.required' => 'Qty wajib diisi untuk setiap item obat.',
+            'items.*.quantity.numeric' => 'Qty harus berupa angka.',
             'items.*.quantity.gt' => 'Qty harus lebih besar dari nol.',
+            'items.*.unit_price.required' => 'Harga beli wajib diisi untuk setiap item obat.',
+            'items.*.unit_price.numeric' => 'Harga beli harus berupa angka.',
+            'items.*.unit_price.min' => 'Harga beli tidak boleh kurang dari nol.',
+            'items.*.discount_percentage.max' => 'Diskon persentase maksimal 100%.',
         ];
     }
 
@@ -106,12 +125,23 @@ class PurchaseInvoiceRequest extends FormRequest
      */
     protected function failedValidation(Validator $validator): void
     {
+        $details = collect($validator->errors()->all())
+            ->map(fn (string $message): string => trim($message))
+            ->filter()
+            ->unique()
+            ->take(6)
+            ->values()
+            ->all();
+
         $response = redirect($this->getRedirectUrl())
             ->withInput($this->except($this->dontFlash))
             ->withErrors($validator, $this->errorBag)
             ->with('toast', [
                 'type' => 'error',
-                'message' => 'Periksa kembali input faktur pembelian. Masih ada data yang perlu diperbaiki.',
+                'message' => count($details) === 1
+                    ? 'Faktur pembelian belum dapat disimpan karena ada satu data yang perlu diperbaiki.'
+                    : 'Faktur pembelian belum dapat disimpan karena ada beberapa data yang perlu diperbaiki.',
+                'details' => $details,
             ]);
 
         throw new ValidationException($validator, $response);

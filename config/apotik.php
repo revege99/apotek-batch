@@ -26,11 +26,10 @@ return [
         [
             'label' => 'Pembelian',
             'icon' => 'cart',
-            'summary' => 'Siklus faktur, hutang supplier, dan retur pembelian.',
+            'summary' => 'Siklus faktur dan retur pembelian.',
             'children' => [
                 ['label' => 'Input Faktur Pembelian', 'route' => 'pembelian.input-faktur-pembelian', 'path' => 'pembelian/input-faktur-pembelian'],
                 ['label' => 'Data Pembelian', 'route' => 'pembelian.data-pembelian', 'path' => 'pembelian/data-pembelian'],
-                ['label' => 'Hutang Supplier', 'route' => 'pembelian.hutang-supplier', 'path' => 'pembelian/hutang-supplier'],
                 ['label' => 'Retur Pembelian', 'route' => 'pembelian.retur-pembelian', 'path' => 'pembelian/retur-pembelian'],
                 ['label' => 'Tukar Barang', 'route' => 'pembelian.tukar-barang', 'path' => 'pembelian/tukar-barang'],
                 ['label' => 'Realisasi Pengganti Retur', 'route' => 'pembelian.realisasi-pengganti-retur', 'path' => 'pembelian/realisasi-pengganti-retur'],
@@ -64,9 +63,10 @@ return [
             'summary' => 'Piutang, pembayaran, dan tindak lanjut saldo operasional harian.',
             'children' => [
                 ['label' => 'Piutang Pelanggan', 'route' => 'keuangan.piutang-pelanggan', 'path' => 'keuangan/piutang-pelanggan'],
-                ['label' => 'Riwayat Pembayaran', 'route' => 'keuangan.riwayat-pembayaran', 'path' => 'keuangan/riwayat-pembayaran'],
+                ['label' => 'Riwayat Piutang', 'route' => 'keuangan.riwayat-pembayaran', 'path' => 'keuangan/riwayat-pembayaran'],
+                ['label' => 'Hutang Supplier', 'route' => 'keuangan.pembayaran-hutang', 'path' => 'keuangan/pembayaran-hutang'],
+                ['label' => 'Riwayat Hutang', 'route' => 'keuangan.riwayat-pembayaran-hutang', 'path' => 'keuangan/riwayat-pembayaran-hutang'],
                 ['label' => 'Riwayat Tagihan Internal', 'route' => 'keuangan.riwayat-tagihan-internal', 'path' => 'keuangan/riwayat-tagihan-internal'],
-                ['label' => 'Pembayaran Hutang', 'route' => 'keuangan.pembayaran-hutang', 'path' => 'keuangan/pembayaran-hutang'],
             ],
         ],
         [

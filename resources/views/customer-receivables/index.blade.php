@@ -14,7 +14,7 @@
                 <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
                     <path d="M3.333 5.833h13.334M3.333 10h13.334M3.333 14.167h13.334" />
                 </svg>
-                Riwayat Pembayaran
+                Riwayat Piutang
             </a>
         </div>
     </x-slot>

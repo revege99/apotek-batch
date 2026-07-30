@@ -684,7 +684,6 @@ document.addEventListener('alpine:init', () => {
         rowIsUsed(row) {
             return [
                 row.batch_number,
-                row.expiry_date,
                 row.quantity,
                 row.unit_price,
                 row.discount_percentage,
@@ -1336,6 +1335,25 @@ document.addEventListener('alpine:init', () => {
             return this.customers.find((customer) => String(customer.id ?? '') === currentId) ?? null;
         },
 
+        hasSelectedCustomer() {
+            return this.selectedCustomer() !== null;
+        },
+
+        requireCustomer() {
+            if (this.hasSelectedCustomer()) {
+                return true;
+            }
+
+            this.showStockWarning('Pilih pelanggan terlebih dahulu sebelum mengubah harga jual atau qty.');
+            this.customerDropdownOpen = this.customers.length > 0;
+
+            this.$nextTick(() => {
+                this.$refs.customerSearchInput?.focus();
+            });
+
+            return false;
+        },
+
         customerDisplayLabel(customer) {
             if (! customer) {
                 return '';
@@ -1505,6 +1523,11 @@ document.addEventListener('alpine:init', () => {
         },
 
         handleSellingPriceInput(row, event) {
+            if (! this.requireCustomer()) {
+                event.target.value = row.unit_price_display;
+                return;
+            }
+
             const parsedValue = this.parseMoneyInput(event?.target?.value ?? row.unit_price_display);
             const unitPrice = roundCurrency(Math.max(toNumber(parsedValue, 0), 0));
             const baseUnitCost = Math.max(toNumber(row.base_unit_cost, 0), 0);

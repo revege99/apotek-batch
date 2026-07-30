@@ -119,7 +119,7 @@
             </div>
 
             <div class="overflow-x-auto">
-                <table class="min-w-[960px] w-full divide-y divide-slate-200/80 text-[0.76rem]">
+                <table class="min-w-[1040px] w-full divide-y divide-slate-200/80 text-[0.76rem]">
                     <thead class="bg-slate-50/90">
                         <tr class="text-left text-[0.66rem] font-semibold uppercase tracking-[0.14em] text-slate-400">
                             <th class="px-4 py-3">No Faktur</th>
@@ -128,6 +128,7 @@
                             <th class="px-3 py-3">Batch</th>
                             <th class="px-3 py-3 text-center">Jumlah</th>
                             <th class="px-3 py-3">Supplier</th>
+                            <th class="px-3 py-3 text-center">Pembayaran</th>
                             <th class="px-3 py-3 text-right">Grand Total</th>
                             <th class="px-3 py-3 text-center">Aksi</th>
                         </tr>
@@ -149,12 +150,11 @@
                                     'items' => $items->map(fn ($item) => [
                                         'id' => $item->id,
                                         'medicine' => $item->medicine?->name ?: '-',
-                                        'medicine_code' => $item->medicine?->code ?: '-',
                                         'batch' => $item->batch_number ?: '-',
                                         'expiry' => $item->expiry_date?->translatedFormat('d M Y') ?? '-',
                                         'hpp' => 'Rp '.rtrim(rtrim(number_format((float) ($item->stockBatch?->purchase_price ?? 0), 2, ',', '.'), '0'), ',')
                                             .' / '.($item->purchase_unit ?: 'unit'),
-                                        'quantity' => number_format((float) $item->quantity, 2, ',', '.').' '.($item->purchase_unit ?: ''),
+                                        'quantity' => number_format((float) $item->quantity, 0, ',', '.').' '.($item->purchase_unit ?: ''),
                                         'line_total' => 'Rp '.number_format((float) $item->line_total, 0, ',', '.'),
                                     ])->values()->all(),
                                 ];
@@ -175,15 +175,14 @@
                                         </td>
                                     @endif
 
-                                    <td class="px-3 py-3">
+                                    <td class="px-3 py-1.5">
                                         <p class="font-semibold text-slate-900">{{ $item->medicine?->name ?: '-' }}</p>
-                                        <p class="mt-1 text-[0.66rem] text-slate-400">{{ $item->medicine?->code ?: '-' }}</p>
                                     </td>
-                                    <td class="px-3 py-3 text-slate-700">
+                                    <td class="px-3 py-1.5 text-slate-700">
                                         {{ $item->batch_number ?: '-' }}
                                     </td>
-                                    <td class="px-3 py-3 text-center font-semibold text-slate-900">
-                                        {{ number_format((float) $item->quantity, 2, ',', '.') }}
+                                    <td class="px-3 py-1.5 text-center font-semibold text-slate-900">
+                                        {{ number_format((float) $item->quantity, 0, ',', '.') }}
                                         <span class="text-[0.66rem] font-medium text-slate-500">{{ $item->purchase_unit }}</span>
                                     </td>
 
@@ -191,57 +190,91 @@
                                         <td rowspan="{{ $rowspan }}" class="px-3 py-3 text-slate-700">
                                             {{ $invoice->supplier?->name ?: '-' }}
                                         </td>
+                                        <td rowspan="{{ $rowspan }}" class="px-3 py-3 text-center">
+                                            <span @class([
+                                                'inline-flex rounded-full border px-2.5 py-1 text-[0.66rem] font-semibold uppercase tracking-[0.14em]',
+                                                'border-amber-200 bg-amber-50 text-amber-700' => $invoice->payment_method === 'credit',
+                                                'border-emerald-200 bg-emerald-50 text-emerald-700' => $invoice->payment_method !== 'credit',
+                                            ])>
+                                                {{ $invoice->payment_method === 'credit' ? 'Kredit' : 'Cash' }}
+                                            </span>
+                                        </td>
                                         <td rowspan="{{ $rowspan }}" class="px-3 py-3 text-right font-semibold text-emerald-700">
                                             Rp {{ number_format((float) $invoice->grand_total, 0, ',', '.') }}
                                         </td>
                                         <td rowspan="{{ $rowspan }}" class="px-3 py-3 align-middle">
-                                            <div class="table-action-group">
+                                            <div
+                                                x-data="floatingActionMenu()"
+                                                @keydown.escape.window="close()"
+                                                @click.window="if (open && ! $refs.trigger.contains($event.target) && ! ($refs.panel && $refs.panel.contains($event.target))) close()"
+                                                class="relative flex min-h-8 items-center justify-center"
+                                            >
                                                 <button
+                                                    x-ref="trigger"
                                                     type="button"
-                                                    @click="openDetail(@js($detailPayload))"
-                                                    class="table-icon-btn"
-                                                    title="Lihat detail faktur"
-                                                    aria-label="Lihat detail faktur {{ $invoice->invoice_number }}"
+                                                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+                                                    title="Aksi pembelian"
+                                                    aria-label="Aksi {{ $invoice->invoice_number }}"
+                                                    @click="toggleMenu()"
                                                 >
-                                                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-                                                        <path d="M2.06 12.35a1 1 0 0 1 0-.7C3.2 8.38 6.52 5 12 5s8.8 3.38 9.94 6.65a1 1 0 0 1 0 .7C20.8 15.62 17.48 19 12 19s-8.8-3.38-9.94-6.65Z" />
-                                                        <circle cx="12" cy="12" r="3" />
+                                                    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
+                                                        <circle cx="5" cy="12" r="1.75" />
+                                                        <circle cx="12" cy="12" r="1.75" />
+                                                        <circle cx="19" cy="12" r="1.75" />
                                                     </svg>
-                                                    <span class="sr-only">Lihat detail</span>
+                                                    <span class="sr-only">Aksi</span>
                                                 </button>
 
-                                                <a
-                                                    href="{{ route('pembelian.data-pembelian.edit', $invoice) }}"
-                                                    class="table-icon-btn"
-                                                    title="Ubah faktur"
-                                                    aria-label="Ubah faktur {{ $invoice->invoice_number }}"
-                                                >
-                                                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-                                                        <path d="M12 20h9" />
-                                                        <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
-                                                    </svg>
-                                                    <span class="sr-only">Ubah</span>
-                                                </a>
+                                                <template x-teleport="body">
+                                                    <div
+                                                        x-cloak
+                                                        x-show="open"
+                                                        x-ref="panel"
+                                                        x-transition.opacity.duration.120ms
+                                                        x-bind:style="menuStyles"
+                                                        class="fixed z-[70] w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1.5 shadow-xl shadow-slate-200/70"
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            class="flex w-full items-center gap-2 px-3 py-2 text-left text-[0.8rem] font-medium text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700"
+                                                            @click="close(); openDetail(@js($detailPayload))"
+                                                        >
+                                                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                                                                <path d="M2.06 12.35a1 1 0 0 1 0-.7C3.2 8.38 6.52 5 12 5s8.8 3.38 9.94 6.65a1 1 0 0 1 0 .7C20.8 15.62 17.48 19 12 19s-8.8-3.38-9.94-6.65Z" />
+                                                                <circle cx="12" cy="12" r="3" />
+                                                            </svg>
+                                                            <span>Detail</span>
+                                                        </button>
 
-                                                <button
-                                                    type="button"
-                                                    @click="openDelete(@js([
-                                                        'invoice_number' => $invoice->invoice_number,
-                                                        'delete_url' => route('pembelian.data-pembelian.destroy', $invoice),
-                                                    ]))"
-                                                    class="table-icon-btn table-icon-btn--danger"
-                                                    title="Hapus faktur"
-                                                    aria-label="Hapus faktur {{ $invoice->invoice_number }}"
-                                                >
-                                                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-                                                        <path d="M3 6h18" />
-                                                        <path d="M8 6V4.75A1.75 1.75 0 0 1 9.75 3h4.5A1.75 1.75 0 0 1 16 4.75V6" />
-                                                        <path d="M19 6l-.82 11.47A2 2 0 0 1 16.19 19H7.81a2 2 0 0 1-1.99-1.53L5 6" />
-                                                        <path d="M10 10.5v5" />
-                                                        <path d="M14 10.5v5" />
-                                                    </svg>
-                                                    <span class="sr-only">Hapus</span>
-                                                </button>
+                                                        <a
+                                                            href="{{ route('pembelian.data-pembelian.edit', $invoice) }}"
+                                                            class="flex w-full items-center gap-2 px-3 py-2 text-left text-[0.8rem] font-medium text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700"
+                                                            @click="close()"
+                                                        >
+                                                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                                                                <path d="M12 20h9" />
+                                                                <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
+                                                            </svg>
+                                                            <span>Edit</span>
+                                                        </a>
+
+                                                        <button
+                                                            type="button"
+                                                            class="flex w-full items-center gap-2 px-3 py-2 text-left text-[0.8rem] font-medium text-rose-700 transition hover:bg-rose-50 hover:text-rose-800"
+                                                            @click="close(); openDelete(@js([
+                                                                'invoice_number' => $invoice->invoice_number,
+                                                                'delete_url' => route('pembelian.data-pembelian.destroy', $invoice),
+                                                            ]))"
+                                                        >
+                                                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                                                                <path d="M3 6h18" />
+                                                                <path d="M8 6V4.75A1.75 1.75 0 0 1 9.75 3h4.5A1.75 1.75 0 0 1 16 4.75V6" />
+                                                                <path d="M19 6l-.82 11.47A2 2 0 0 1 16.19 19H7.81a2 2 0 0 1-1.99-1.53L5 6" />
+                                                            </svg>
+                                                            <span>Hapus</span>
+                                                        </button>
+                                                    </div>
+                                                </template>
                                             </div>
                                         </td>
                                     @endif
@@ -252,13 +285,22 @@
                                     <td class="px-3 py-3 text-slate-700">{{ $invoice->invoice_date?->translatedFormat('d M Y') ?? '-' }}</td>
                                     <td colspan="3" class="px-3 py-3 text-slate-400">Detail barang belum tersedia.</td>
                                     <td class="px-3 py-3 text-slate-700">{{ $invoice->supplier?->name ?: '-' }}</td>
+                                    <td class="px-3 py-3 text-center">
+                                        <span @class([
+                                            'inline-flex rounded-full border px-2.5 py-1 text-[0.66rem] font-semibold uppercase tracking-[0.14em]',
+                                            'border-amber-200 bg-amber-50 text-amber-700' => $invoice->payment_method === 'credit',
+                                            'border-emerald-200 bg-emerald-50 text-emerald-700' => $invoice->payment_method !== 'credit',
+                                        ])>
+                                            {{ $invoice->payment_method === 'credit' ? 'Kredit' : 'Cash' }}
+                                        </span>
+                                    </td>
                                     <td class="px-3 py-3 text-right font-semibold text-emerald-700">Rp {{ number_format((float) $invoice->grand_total, 0, ',', '.') }}</td>
                                     <td></td>
                                 </tr>
                             @endforelse
                         @empty
                             <tr>
-                                <td colspan="8" class="px-5 py-14 text-center">
+                                <td colspan="9" class="px-5 py-14 text-center">
                                     <div class="mx-auto max-w-md space-y-3">
                                         <div class="empty-title">Belum ada data pembelian</div>
                                         <p class="content-copy">Input faktur pembelian pertama untuk mulai mencatat transaksi supplier dan penerimaan stok.</p>
@@ -329,7 +371,6 @@
                                     <tr>
                                         <td class="px-3 py-3">
                                             <p class="font-semibold text-slate-900" x-text="item.medicine"></p>
-                                            <p class="mt-1 text-[0.66rem] text-slate-400" x-text="item.medicine_code"></p>
                                         </td>
                                         <td class="px-3 py-3 text-slate-700" x-text="item.batch"></td>
                                         <td class="px-3 py-3 text-slate-700" x-text="item.hpp"></td>
