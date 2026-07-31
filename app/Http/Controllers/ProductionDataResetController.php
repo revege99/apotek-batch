@@ -33,7 +33,7 @@ class ProductionDataResetController extends Controller
     }
 
     /**
-     * Delete all non-master transactional data.
+     * Delete all opening setup and non-master transactional data.
      */
     public function destroy(Request $request): RedirectResponse
     {
@@ -55,8 +55,8 @@ class ProductionDataResetController extends Controller
             ->with('toast', [
                 'type' => 'success',
                 'message' => $totalDeleted > 0
-                    ? 'Reset data transaksi selesai. '.$totalDeleted.' baris data non-master berhasil dibersihkan.'
-                    : 'Reset data transaksi selesai. Tidak ada data non-master yang perlu dibersihkan.',
+                    ? 'Reset data produksi selesai. '.$totalDeleted.' baris data setup saldo awal dan non-master berhasil dibersihkan.'
+                    : 'Reset data produksi selesai. Tidak ada data setup saldo awal atau non-master yang perlu dibersihkan.',
             ]);
     }
 

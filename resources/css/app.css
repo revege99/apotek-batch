@@ -534,4 +534,59 @@
     .apotik-sidebar__user-btn--logout:hover {
         background: var(--sidebar-accent-muted);
     }
+
+    .medicine-compact-fields {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .medicine-compact-fields > * {
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+    }
+
+    .medicine-compact-fields .grid {
+        gap: 0.5rem;
+    }
+
+    .medicine-compact-fields .space-y-2 > :not([hidden]) ~ :not([hidden]) {
+        margin-top: 0.2rem;
+    }
+
+    .medicine-compact-fields label {
+        font-size: 0.72rem;
+        line-height: 1rem;
+    }
+
+    .medicine-compact-fields input:not([type="checkbox"]),
+    .medicine-compact-fields select,
+    .medicine-compact-fields textarea {
+        border-radius: 0.75rem;
+        padding: 0.35rem 0.75rem;
+        font-size: 0.76rem;
+        line-height: 1.1rem;
+    }
+
+    .medicine-compact-fields textarea {
+        min-height: 2rem;
+        resize: vertical;
+    }
+
+    .medicine-compact-fields > label.flex {
+        gap: 0.55rem;
+        border-radius: 0.8rem;
+        padding: 0.45rem 0.75rem;
+    }
+
+    .medicine-compact-fields > label.flex .content-copy {
+        margin-top: 0;
+        font-size: 0.66rem;
+        line-height: 0.95rem;
+    }
+
+    .medicine-compact-fields .text-rose-600 {
+        font-size: 0.68rem;
+        line-height: 0.9rem;
+    }
 }

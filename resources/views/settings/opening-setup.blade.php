@@ -12,6 +12,7 @@
             initialRows: @js($initialRows),
             locationOptions: @js($locationOptions),
             initialLocationId: @js($initialLocationId),
+            defaultExpiryDate: @js(now()->toDateString()),
         })"
         class="space-y-5"
     >
@@ -19,10 +20,6 @@
             <div class="border-b border-slate-200/80 px-4 py-3">
                 <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                     <div class="flex flex-wrap items-center gap-2 text-[0.72rem]">
-                        <div class="rounded-full bg-slate-100 px-3 py-2 font-semibold text-slate-700">
-                            Rp {{ number_format($openingStockStats['value'], 0, ',', '.') }}
-                        </div>
-
                         <div class="flex items-center gap-2">
                             <label for="entry_number" class="text-[0.66rem] font-semibold uppercase tracking-[0.14em] text-slate-500">No dokumen</label>
                             <input
@@ -100,9 +97,6 @@
                                         <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
                                     </svg>
                                 </button>
-                                <a href="{{ route('setup-saldo-awal.stok.riwayat') }}" class="ui-action-btn ui-action-btn--neutral w-full px-4 text-[0.74rem] sm:w-auto">
-                                    Riwayat
-                                </a>
                                 <button type="submit" class="ui-action-btn ui-action-btn--soft w-full px-4 text-[0.74rem] sm:w-auto">
                                     Simpan saldo awal
                                 </button>
@@ -135,80 +129,69 @@
                     <table class="w-full table-fixed divide-y divide-slate-200/80 text-[0.72rem]">
                         <thead class="bg-slate-50/95">
                             <tr class="text-left text-[0.66rem] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                                <th class="w-[27%] px-1.5 py-2">Obat</th>
-                                <th class="w-[10%] px-1 py-2 text-center">Batch</th>
+                                <th class="w-[34%] px-1.5 py-2">Obat</th>
+                                <th class="w-[17%] px-1 py-2 text-center">Batch</th>
                                 <th class="w-[21%] px-1 py-2 text-center">Expired</th>
-                                <th class="w-[8%] px-1 py-2 text-center">Qty Awal</th>
-                                <th class="w-[16%] px-1 py-2 text-right">Harga Beli</th>
-                                <th class="w-[18%] px-1.5 py-2 text-right">Nilai</th>
+                                <th class="w-[12%] px-1 py-2 text-center">Qty Awal</th>
+                                <th class="w-[16%] px-1.5 py-2 text-center">Status</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-200/80 bg-white">
                             <template x-for="item in filteredRows()" :key="item.row.key">
                                 <tr class="align-middle" :class="isCompanionPlaceholder(item.row) ? 'bg-emerald-50/35' : ''">
                                     <td class="px-1.5 py-1.5">
-                                        <input type="hidden" :name="`items[${item.index}][medicine_id]`" x-model="item.row.medicine_id">
-                                        <input type="hidden" :name="`items[${item.index}][storage_location_id]`" x-model="item.row.storage_location_id">
-                                        <div>
-                                            <div class="flex min-h-[35px] items-center rounded-xl border border-slate-200 bg-slate-50 px-2 text-[0.72rem] font-semibold text-slate-900">
-                                                <span x-text="item.row.medicine_name || '-'"></span>
-                                            </div>
-                                        </div>
+                                        <input type="hidden" :name="rowShouldSubmit(item.row) ? `items[${item.index}][medicine_id]` : null" x-model="item.row.medicine_id">
+                                        <input type="hidden" :name="rowShouldSubmit(item.row) ? `items[${item.index}][storage_location_id]` : null" x-model="item.row.storage_location_id">
+                                        <input type="hidden" :name="rowShouldSubmit(item.row) ? `items[${item.index}][opening_item_id]` : null" x-model="item.row.opening_item_id">
+                                        <div class="px-1 text-[0.72rem] font-semibold text-slate-900" x-text="item.row.medicine_name || '-'"></div>
                                     </td>
                                     <td class="px-1 py-1.5 text-center">
                                         <input
-                                            :name="`items[${item.index}][batch_number]`"
+                                            :name="rowShouldSubmit(item.row) ? `items[${item.index}][batch_number]` : null"
                                             x-model="item.row.batch_number"
+                                            @input="markRowForSubmit(item.index)"
                                             type="text"
-                                            class="ui-control mx-auto h-[35px] px-2 text-[0.72rem]"
+                                            class="ui-control mx-auto !h-[35px] min-h-[35px] max-h-[35px] px-2 text-[0.72rem]"
                                             style="width: 4.6rem; min-width: 4.6rem; max-width: 4.6rem;"
-                                            placeholder="No batch"
+                                            placeholder="Opsional"
                                         >
                                     </td>
                                     <td class="px-1 py-1.5 text-center">
                                         <input
-                                            :name="`items[${item.index}][expiry_date]`"
+                                            :name="rowShouldSubmit(item.row) ? `items[${item.index}][expiry_date]` : null"
                                             x-model="item.row.expiry_date"
+                                            @change="markRowForSubmit(item.index)"
                                             type="date"
-                                            class="ui-control mx-auto h-[35px] px-2 text-[0.72rem]"
+                                            class="ui-control mx-auto !h-[35px] min-h-[35px] max-h-[35px] px-2 text-[0.72rem]"
                                             style="width: 8rem; min-width: 8rem; max-width: 8rem;"
                                         >
                                     </td>
                                     <td class="px-1 py-1.5 text-center">
                                         <input
-                                            :name="`items[${item.index}][quantity]`"
+                                            :name="rowShouldSubmit(item.row) ? `items[${item.index}][quantity]` : null"
                                             x-model="item.row.quantity"
                                             @input="handleNumericInput(item.index, 'quantity')"
                                             type="number"
                                             min="0"
-                                            step="0.01"
-                                            class="ui-control number-input-no-spinner mx-auto h-[35px] px-1.5 text-center text-[0.72rem]"
-                                            style="width: 2.5rem; min-width: 2.5rem; max-width: 2.5rem;"
+                                            step="1"
+                                            class="ui-control number-input-no-spinner mx-auto !h-[35px] min-h-[35px] max-h-[35px] px-1.5 text-center text-[0.72rem]"
+                                            style="width: 3.5rem; min-width: 3.5rem; max-width: 3.5rem;"
                                             placeholder="0"
                                         >
                                     </td>
-                                    <td class="px-1 py-1.5 text-right">
-                                        <input
-                                            :name="`items[${item.index}][purchase_price]`"
-                                            x-model="item.row.purchase_price"
-                                            @input="handleNumericInput(item.index, 'purchase_price')"
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            class="ui-control number-input-no-spinner ml-auto h-[35px] px-2 text-right text-[0.72rem]"
-                                            style="width: 4.8rem; min-width: 4.8rem; max-width: 4.8rem;"
-                                            placeholder="0"
-                                        >
-                                    </td>
-                                    <td class="px-1.5 py-1.5 text-right font-semibold text-emerald-700">
-                                        <input type="hidden" :name="`items[${item.index}][notes]`" x-model="item.row.notes">
-                                        <input type="hidden" :name="`items[${item.index}][selling_price]`" x-model="item.row.selling_price">
-                                        <span x-text="currency(rowValue(item.row))"></span>
+                                    <td class="px-1.5 py-1.5 text-center">
+                                        <span
+                                            class="inline-flex rounded-full border px-2.5 py-1 text-[0.66rem] font-semibold uppercase tracking-[0.12em]"
+                                            :class="item.row.is_active
+                                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                                : 'border-slate-200 bg-slate-100 text-slate-500'"
+                                            x-text="item.row.is_active ? 'Aktif' : 'Nonaktif'"
+                                        ></span>
                                     </td>
                                 </tr>
                             </template>
                             <tr x-show="filteredRows().length === 0">
-                                <td colspan="6" class="px-4 py-14 text-center">
+                                <td colspan="5" class="px-4 py-14 text-center">
                                     <div class="mx-auto max-w-md space-y-3">
                                         <div class="empty-title">Obat tidak ditemukan</div>
                                         <p class="content-copy">Coba ubah kata kunci pencarian untuk menampilkan obat yang ingin diisi saldo awalnya.</p>
@@ -218,6 +201,7 @@
                         </tbody>
                     </table>
                 </div>
+
             </form>
         </section>
     </div>

@@ -288,8 +288,8 @@
             class="fixed inset-0 z-40 overflow-y-auto bg-slate-950/50 backdrop-blur-sm"
             @click.self="createModalOpen = false"
         >
-            <div class="flex min-h-full items-start justify-center p-4 sm:items-center sm:p-6">
-                <div class="panel-surface relative z-50 max-h-[calc(100vh-2rem)] w-full max-w-5xl overflow-y-auto p-6 sm:max-h-[calc(100vh-3rem)] sm:p-7">
+            <div class="flex min-h-full items-start justify-center p-3 sm:items-center sm:p-4">
+                <div class="panel-surface relative z-50 max-h-[calc(100vh-1.5rem)] w-full max-w-5xl overflow-y-auto p-4 sm:max-h-[calc(100vh-2rem)] sm:p-5">
                     <div class="flex items-start justify-between gap-4">
                         <div>
                             <div class="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
@@ -299,7 +299,7 @@
 
                         <button
                             type="button"
-                            class="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-900"
+                            class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-900"
                             @click="createModalOpen = false"
                         >
                             <span class="sr-only">Tutup modal</span>
@@ -315,7 +315,7 @@
                         </div>
                     @endif
 
-                    <form method="POST" action="{{ route('master-data.data-obat.store') }}" class="mt-6 space-y-4">
+                    <form method="POST" action="{{ route('master-data.data-obat.store') }}" class="mt-3 space-y-2">
                         @csrf
                         <input type="hidden" name="_modal" value="create">
 
@@ -325,9 +325,11 @@
                             $fieldPrefix = 'create_';
                         @endphp
 
-                        @include('medicines._fields')
+                        <div class="medicine-compact-fields">
+                            @include('medicines._fields')
+                        </div>
 
-                        <div class="flex flex-col gap-3 border-t border-slate-200/80 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="flex flex-col gap-2 border-t border-slate-200/80 pt-3 sm:flex-row sm:items-center sm:justify-between">
                             <button
                                 type="button"
                                 class="ui-action-btn ui-action-btn--neutral"
@@ -338,7 +340,7 @@
 
                             <button
                                 type="submit"
-                                class="inline-flex items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-600"
+                                class="inline-flex items-center justify-center rounded-xl border border-emerald-300 bg-emerald-500 px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-600"
                             >
                                 Simpan data obat
                             </button>
@@ -356,8 +358,8 @@
                 class="fixed inset-0 z-40 overflow-y-auto bg-slate-950/50 backdrop-blur-sm"
                 @click.self="closeEdit()"
             >
-                <div class="flex min-h-full items-start justify-center p-4 sm:items-center sm:p-6">
-                    <div class="panel-surface relative z-50 max-h-[calc(100vh-2rem)] w-full max-w-5xl overflow-y-auto p-6 sm:max-h-[calc(100vh-3rem)] sm:p-7">
+                <div class="flex min-h-full items-start justify-center p-3 sm:items-center sm:p-4">
+                    <div class="panel-surface relative z-50 max-h-[calc(100vh-1.5rem)] w-full max-w-5xl overflow-y-auto p-4 sm:max-h-[calc(100vh-2rem)] sm:p-5">
                         <div class="flex items-start justify-between gap-4">
                             <div>
                                 <div class="inline-flex items-center gap-2 rounded-full border border-sky-100 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
@@ -367,7 +369,7 @@
 
                             <button
                                 type="button"
-                                class="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-900"
+                                class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-900"
                                 @click="closeEdit()"
                             >
                                 <span class="sr-only">Tutup modal</span>
@@ -383,7 +385,7 @@
                             </div>
                         @endif
 
-                        <form method="POST" action="{{ route('master-data.data-obat.update', $editingMedicine) }}" class="mt-6 space-y-4">
+                        <form method="POST" action="{{ route('master-data.data-obat.update', $editingMedicine) }}" class="mt-3 space-y-2">
                             @csrf
                             @method('PATCH')
                             <input type="hidden" name="_modal" value="edit">
@@ -401,9 +403,11 @@
                                 $fieldPrefix = 'edit_';
                             @endphp
 
-                            @include('medicines._fields')
+                            <div class="medicine-compact-fields">
+                                @include('medicines._fields')
+                            </div>
 
-                            <div class="flex flex-col gap-3 border-t border-slate-200/80 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div class="flex flex-col gap-2 border-t border-slate-200/80 pt-3 sm:flex-row sm:items-center sm:justify-between">
                                 <button
                                     type="button"
                                     class="ui-action-btn ui-action-btn--neutral"
@@ -414,7 +418,7 @@
 
                                 <button
                                     type="submit"
-                                    class="inline-flex items-center justify-center rounded-2xl border border-sky-300 bg-sky-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-500/20 transition hover:bg-sky-600"
+                                    class="inline-flex items-center justify-center rounded-xl border border-sky-300 bg-sky-500 px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-600"
                                 >
                                     Simpan perubahan
                                 </button>

@@ -330,7 +330,7 @@ class InternalBillingController extends Controller
         return StockAdjustmentRecovery::query()
             ->with([
                 'followUp:id,stock_opname_item_id,adjustment_number,status',
-                'followUp.opnameItem:id,stock_opname_id,medicine_id',
+                'followUp.opnameItem:id,stock_opname_id,medicine_id,medicine_code_snapshot,medicine_name_snapshot,medicine_unit_snapshot',
                 'followUp.opnameItem.medicine:id,code,name',
                 'followUp.opnameItem.stockOpname:id,opname_number,opname_date',
                 'payments:id,stock_adjustment_recovery_id,payment_number,payment_date,payment_method,amount_paid',
@@ -341,7 +341,8 @@ class InternalBillingController extends Controller
                         ->where('employee_name', 'like', "%{$search}%")
                         ->orWhere('notes', 'like', "%{$search}%")
                         ->orWhereHas('followUp', fn (Builder $followUpQuery) => $followUpQuery->where('adjustment_number', 'like', "%{$search}%"))
-                        ->orWhereHas('followUp.opnameItem.medicine', fn (Builder $medicineQuery) => $medicineQuery->where('name', 'like', "%{$search}%"));
+                        ->orWhereHas('followUp.opnameItem.medicine', fn (Builder $medicineQuery) => $medicineQuery->where('name', 'like', "%{$search}%"))
+                        ->orWhereHas('followUp.opnameItem', fn (Builder $itemQuery) => $itemQuery->where('medicine_name_snapshot', 'like', "%{$search}%"));
                 });
             })
             ->when($status !== 'all', fn (Builder $query) => $query->where('status', $status));
@@ -355,7 +356,7 @@ class InternalBillingController extends Controller
         $recoveries = StockAdjustmentRecovery::query()
             ->with([
                 'followUp:id,stock_opname_item_id,adjustment_number,status,adjustment_date',
-                'followUp.opnameItem:id,stock_opname_id,medicine_id',
+                'followUp.opnameItem:id,stock_opname_id,medicine_id,medicine_code_snapshot,medicine_name_snapshot,medicine_unit_snapshot',
                 'followUp.opnameItem.medicine:id,code,name',
                 'followUp.opnameItem.stockOpname:id,opname_number,opname_date',
                 'payments:id,stock_adjustment_recovery_id,payment_number,payment_date,payment_method,amount_paid',

@@ -37,7 +37,7 @@ class SupplierPayableController extends Controller
     {
         $invoices = PurchaseInvoice::query()
             ->with([
-                'items:id,purchase_invoice_id,medicine_id,batch_number,quantity,unit_price,line_total',
+                'items:id,purchase_invoice_id,medicine_id,medicine_code_snapshot,medicine_name_snapshot,medicine_unit_snapshot,batch_number,quantity,unit_price,line_total',
                 'items.medicine:id,name,small_unit',
             ])
             ->where('supplier_id', $supplier->id)
@@ -207,7 +207,7 @@ class SupplierPayableController extends Controller
             ->with([
                 'allocations:id,supplier_payment_id,purchase_invoice_id,amount_paid',
                 'allocations.purchaseInvoice:id,invoice_number,invoice_date,grand_total',
-                'allocations.purchaseInvoice.items:id,purchase_invoice_id,medicine_id,batch_number,quantity,unit_price,line_total',
+                'allocations.purchaseInvoice.items:id,purchase_invoice_id,medicine_id,medicine_code_snapshot,medicine_name_snapshot,medicine_unit_snapshot,batch_number,quantity,unit_price,line_total',
                 'allocations.purchaseInvoice.items.medicine:id,name,small_unit',
             ])
             ->where('supplier_id', $supplier->id)

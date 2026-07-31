@@ -46,6 +46,8 @@ class PurchaseInvoiceController extends Controller
                         ->orWhereHas('items', function ($itemQuery) use ($search) {
                             $itemQuery
                                 ->where('batch_number', 'like', "%{$search}%")
+                                ->orWhere('medicine_code_snapshot', 'like', "%{$search}%")
+                                ->orWhere('medicine_name_snapshot', 'like', "%{$search}%")
                                 ->orWhereHas('medicine', function ($medicineQuery) use ($search) {
                                     $medicineQuery
                                         ->where('code', 'like', "%{$search}%")

@@ -524,11 +524,11 @@ class ReportController extends Controller
         return StockAdjustmentRecoveryPayment::query()
             ->with([
                 'recovery:id,stock_movement_id,stock_adjustment_follow_up_id,employee_name',
-                'recovery.stockMovement:id,medicine_id,stock_batch_id',
+                'recovery.stockMovement:id,medicine_id,medicine_code_snapshot,medicine_name_snapshot,medicine_unit_snapshot,stock_batch_id',
                 'recovery.stockMovement.medicine:id,name',
                 'recovery.stockMovement.stockBatch:id,batch_number',
                 'recovery.followUp:id,stock_opname_item_id,adjustment_number',
-                'recovery.followUp.opnameItem:id,medicine_id',
+                'recovery.followUp.opnameItem:id,medicine_id,medicine_code_snapshot,medicine_name_snapshot,medicine_unit_snapshot',
                 'recovery.followUp.opnameItem.medicine:id,name',
             ])
             ->when($search !== '', function (Builder $query) use ($search) {
@@ -539,8 +539,10 @@ class ReportController extends Controller
                         ->orWhere('notes', 'like', "%{$search}%")
                         ->orWhereHas('recovery', fn (Builder $recoveryQuery) => $recoveryQuery->where('employee_name', 'like', "%{$search}%"))
                         ->orWhereHas('recovery.stockMovement.medicine', fn (Builder $medicineQuery) => $medicineQuery->where('name', 'like', "%{$search}%"))
+                        ->orWhereHas('recovery.stockMovement', fn (Builder $movementQuery) => $movementQuery->where('medicine_name_snapshot', 'like', "%{$search}%"))
                         ->orWhereHas('recovery.stockMovement.stockBatch', fn (Builder $batchQuery) => $batchQuery->where('batch_number', 'like', "%{$search}%"))
                         ->orWhereHas('recovery.followUp.opnameItem.medicine', fn (Builder $medicineQuery) => $medicineQuery->where('name', 'like', "%{$search}%"))
+                        ->orWhereHas('recovery.followUp.opnameItem', fn (Builder $itemQuery) => $itemQuery->where('medicine_name_snapshot', 'like', "%{$search}%"))
                         ->orWhereHas('recovery.followUp', fn (Builder $followUpQuery) => $followUpQuery->where('adjustment_number', 'like', "%{$search}%"));
                 });
             })
@@ -633,6 +635,8 @@ class ReportController extends Controller
                 $query->where(function (Builder $innerQuery) use ($search) {
                     $innerQuery
                         ->where('batch_number', 'like', "%{$search}%")
+                        ->orWhere('medicine_code_snapshot', 'like', "%{$search}%")
+                        ->orWhere('medicine_name_snapshot', 'like', "%{$search}%")
                         ->orWhereHas('medicine', function (Builder $medicineQuery) use ($search) {
                             $medicineQuery
                                 ->where('code', 'like', "%{$search}%")
@@ -947,9 +951,9 @@ class ReportController extends Controller
                 'stock_movements.notes',
                 'stock_adjustment_follow_ups.adjustment_number',
                 'stock_opnames.opname_number',
-                'medicines.code as medicine_code',
-                'medicines.name as medicine_name',
-                'medicines.small_unit',
+                DB::raw('COALESCE(medicines.code, stock_movements.medicine_code_snapshot) as medicine_code'),
+                DB::raw('COALESCE(medicines.name, stock_movements.medicine_name_snapshot) as medicine_name'),
+                DB::raw('COALESCE(medicines.small_unit, stock_movements.medicine_unit_snapshot) as small_unit'),
                 'stock_batches.batch_number',
                 'storage_locations.name as location_name',
                 'processors.name as processed_by_name',
@@ -977,6 +981,8 @@ class ReportController extends Controller
                         ->orWhere('stock_opnames.opname_number', 'like', "%{$search}%")
                         ->orWhere('medicines.code', 'like', "%{$search}%")
                         ->orWhere('medicines.name', 'like', "%{$search}%")
+                        ->orWhere('stock_movements.medicine_code_snapshot', 'like', "%{$search}%")
+                        ->orWhere('stock_movements.medicine_name_snapshot', 'like', "%{$search}%")
                         ->orWhere('stock_batches.batch_number', 'like', "%{$search}%")
                         ->orWhere('storage_locations.name', 'like', "%{$search}%")
                         ->orWhere('processors.name', 'like', "%{$search}%");
@@ -1015,6 +1021,8 @@ class ReportController extends Controller
                         ->orWhere('stock_opnames.opname_number', 'like', "%{$search}%")
                         ->orWhere('medicines.code', 'like', "%{$search}%")
                         ->orWhere('medicines.name', 'like', "%{$search}%")
+                        ->orWhere('stock_movements.medicine_code_snapshot', 'like', "%{$search}%")
+                        ->orWhere('stock_movements.medicine_name_snapshot', 'like', "%{$search}%")
                         ->orWhere('stock_batches.batch_number', 'like', "%{$search}%")
                         ->orWhere('storage_locations.name', 'like', "%{$search}%")
                         ->orWhere('processors.name', 'like', "%{$search}%");

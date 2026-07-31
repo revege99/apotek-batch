@@ -12,14 +12,14 @@
                     Superadmin
                 </span>
                 <p class="max-w-4xl content-copy">
-                    Gunakan halaman ini hanya saat aplikasi siap dipakai di produksi dan Anda ingin membersihkan seluruh data transaksi lama tanpa menghapus master data.
+                    Gunakan halaman ini hanya saat aplikasi siap dipakai di produksi dan Anda ingin membersihkan seluruh data transaksi serta setup saldo awal lama tanpa menghapus master data.
                 </p>
             </div>
         </div>
     </x-slot>
 
     <div class="space-y-6">
-        <section class="grid gap-4 xl:grid-cols-4">
+        <section class="grid gap-4 xl:grid-cols-5">
             <div class="panel-surface stats-card">
                 <p class="stats-card__label">Total data transaksi</p>
                 <p class="stats-card__value">{{ number_format($totalRows) }}</p>
@@ -47,7 +47,7 @@
                 <div class="min-w-0">
                     <h2 class="text-lg font-semibold text-slate-950">Reset ini bersifat permanen</h2>
                     <p class="mt-2 text-sm leading-6 text-slate-600">
-                        Sistem akan menghapus data transaksi pembelian, penjualan, stok, stok opname, penyesuaian stok, pembayaran, dan histori turunannya. Laporan akan otomatis kosong karena sumber transaksinya sudah dibersihkan.
+                        Sistem akan menghapus data setup saldo awal, transaksi pembelian, penjualan, stok, stok opname, penyesuaian stok, pembayaran, dan histori turunannya. Laporan akan otomatis kosong karena sumber datanya sudah dibersihkan.
                     </p>
                 </div>
             </div>
@@ -132,7 +132,7 @@
                                 class="mt-1 h-4 w-4 rounded border-slate-300 text-rose-600 focus:ring-rose-200"
                             >
                             <span class="text-sm leading-6 text-slate-600">
-                                Saya paham bahwa proses ini menghapus seluruh data non-master secara permanen dan tidak bisa dibatalkan.
+                                Saya paham bahwa proses ini menghapus seluruh data setup saldo awal dan data non-master secara permanen serta tidak bisa dibatalkan.
                             </span>
                         </label>
                         @error('confirmation_acknowledged')
@@ -143,7 +143,7 @@
                             type="submit"
                             class="inline-flex h-[35px] items-center justify-center rounded-xl border border-rose-600 bg-rose-600 px-4 text-xs font-semibold text-white shadow-sm transition hover:border-rose-700 hover:bg-rose-700"
                         >
-                            Hapus Semua Data Transaksi
+                            Hapus Data Transaksi & Saldo Awal
                         </button>
                     </form>
                 </section>

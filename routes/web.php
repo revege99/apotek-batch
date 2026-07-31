@@ -230,9 +230,7 @@ Route::middleware(['auth', 'verified', 'menu.access'])->group(function () use ($
     Route::post('/keuangan/riwayat-tagihan-internal/{stockAdjustmentRecovery}/bayar', [InternalBillingController::class, 'storePayment'])->name('keuangan.riwayat-tagihan-internal.bayar');
     Route::delete('/keuangan/riwayat-tagihan-internal/pembayaran/{stockAdjustmentRecoveryPayment}', [InternalBillingController::class, 'destroyPayment'])->name('keuangan.riwayat-tagihan-internal.destroy-payment');
     Route::get('/setup-saldo-awal/stok', [ProductionOpeningSetupController::class, 'stockIndex'])->name('setup-saldo-awal.stok');
-    Route::get('/setup-saldo-awal/stok/riwayat', [ProductionOpeningSetupController::class, 'stockHistoryIndex'])->name('setup-saldo-awal.stok.riwayat');
     Route::post('/setup-saldo-awal/stok', [ProductionOpeningSetupController::class, 'storeOpeningStock'])->name('setup-saldo-awal.stok.store');
-    Route::delete('/setup-saldo-awal/stok/{openingStockEntryItem}', [ProductionOpeningSetupController::class, 'destroyOpeningStock'])->name('setup-saldo-awal.stok.destroy');
     Route::get('/setup-saldo-awal/piutang', [ProductionOpeningSetupController::class, 'receivableIndex'])->name('setup-saldo-awal.piutang');
     Route::get('/setup-saldo-awal/hutang', [ProductionOpeningSetupController::class, 'payableIndex'])->name('setup-saldo-awal.hutang');
     Route::get('/setup-saldo-awal/kas', [ProductionOpeningSetupController::class, 'cashIndex'])->name('setup-saldo-awal.kas');

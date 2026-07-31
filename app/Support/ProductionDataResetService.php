@@ -15,6 +15,10 @@ class ProductionDataResetService
     public function groupedTables(): array
     {
         return [
+            'Setup Saldo Awal' => [
+                'opening_stock_entry_items',
+                'opening_stock_entries',
+            ],
             'Pembelian' => [
                 'purchase_exchange_replacement_items',
                 'purchase_exchange_replacements',
@@ -85,7 +89,7 @@ class ProductionDataResetService
     }
 
     /**
-     * Purge all non-master transactional data and return deleted row counts.
+     * Purge all opening setup and non-master transactional data.
      *
      * @return array<string, int>
      */

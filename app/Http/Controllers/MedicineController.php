@@ -8,6 +8,7 @@ use App\Models\MedicineCategory;
 use App\Models\MedicineUnit;
 use App\Models\Principal;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -132,15 +133,26 @@ class MedicineController extends Controller
     {
         $medicineName = $medicine->name;
 
-        $medicine->delete();
+        try {
+            $medicine->delete();
+        } catch (QueryException $exception) {
+            if (($exception->errorInfo[0] ?? null) !== '23000') {
+                throw $exception;
+            }
 
-        return redirect()
-            ->route('master-data.data-obat')
+            return back()->with('toast', [
+                'type' => 'error',
+                'message' => "Obat {$medicineName} belum dapat dihapus karena masih ada referensi yang belum memakai snapshot.",
+            ]);
+        }
+
+        return back()
             ->with('toast', [
                 'type' => 'success',
                 'message' => "Obat {$medicineName} berhasil dihapus.",
             ]);
     }
+
 
     /**
      * Build the page metadata for the medicine module.

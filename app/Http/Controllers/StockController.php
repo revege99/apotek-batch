@@ -129,7 +129,9 @@ class StockController extends Controller
                     ->when($search !== '', function (Builder $query) use ($search): void {
                         $query->where(function (Builder $innerQuery) use ($search): void {
                             $innerQuery
-                                ->whereHas('medicine', function (Builder $medicineQuery) use ($search): void {
+                                ->where('medicine_code_snapshot', 'like', "%{$search}%")
+                                ->orWhere('medicine_name_snapshot', 'like', "%{$search}%")
+                                ->orWhereHas('medicine', function (Builder $medicineQuery) use ($search): void {
                                     $medicineQuery
                                         ->where('code', 'like', "%{$search}%")
                                         ->orWhere('name', 'like', "%{$search}%");
@@ -1407,6 +1409,8 @@ class StockController extends Controller
                 $builder->where(function (Builder $innerQuery) use ($search) {
                     $innerQuery
                         ->where('batch_number', 'like', "%{$search}%")
+                        ->orWhere('medicine_code_snapshot', 'like', "%{$search}%")
+                        ->orWhere('medicine_name_snapshot', 'like', "%{$search}%")
                         ->orWhereHas('medicine', function (Builder $medicineQuery) use ($search) {
                             $medicineQuery
                                 ->where('code', 'like', "%{$search}%")
@@ -1437,6 +1441,8 @@ class StockController extends Controller
                 $builder->where(function (Builder $innerQuery) use ($search) {
                     $innerQuery
                         ->where('stock_batches.batch_number', 'like', "%{$search}%")
+                        ->orWhere('stock_batches.medicine_code_snapshot', 'like', "%{$search}%")
+                        ->orWhere('stock_batches.medicine_name_snapshot', 'like', "%{$search}%")
                         ->orWhere('medicines.code', 'like', "%{$search}%")
                         ->orWhere('medicines.name', 'like', "%{$search}%")
                         ->orWhereHas('medicine.principal', fn (Builder $principalQuery) => $principalQuery->where('name', 'like', "%{$search}%"))

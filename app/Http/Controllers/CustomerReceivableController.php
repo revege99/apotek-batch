@@ -392,7 +392,7 @@ class CustomerReceivableController extends Controller
             ->with([
                 'customer:id,name,phone,address',
                 'customerPayments:id,sale_id,payment_date,amount_paid',
-                'items:id,sale_id,medicine_id,batch_number_snapshot,quantity,unit_price,line_total',
+                'items:id,sale_id,medicine_id,medicine_code_snapshot,medicine_name_snapshot,medicine_unit_snapshot,batch_number_snapshot,quantity,unit_price,line_total',
                 'items.medicine:id,name,small_unit',
             ])
             ->where('customer_id', $customer->id)
@@ -456,7 +456,7 @@ class CustomerReceivableController extends Controller
         $paymentRows = $this->customerPaymentBaseQuery('', $dateFrom, $dateTo)
             ->with([
                 'sale:id,sale_number,sale_date',
-                'sale.items:id,sale_id,medicine_id,batch_number_snapshot,quantity,unit_price,line_total',
+                'sale.items:id,sale_id,medicine_id,medicine_code_snapshot,medicine_name_snapshot,medicine_unit_snapshot,batch_number_snapshot,quantity,unit_price,line_total',
                 'sale.items.medicine:id,name,small_unit',
                 'customer:id,name,address',
             ])

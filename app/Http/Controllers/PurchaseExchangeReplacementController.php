@@ -250,6 +250,8 @@ class PurchaseExchangeReplacementController extends Controller
                         ->orWhereHas('items', function ($itemQuery) use ($historySearch) {
                             $itemQuery
                                 ->where('batch_number', 'like', "%{$historySearch}%")
+                                ->orWhere('medicine_code_snapshot', 'like', "%{$historySearch}%")
+                                ->orWhere('medicine_name_snapshot', 'like', "%{$historySearch}%")
                                 ->orWhereHas('medicine', function ($medicineQuery) use ($historySearch) {
                                     $medicineQuery
                                         ->where('code', 'like', "%{$historySearch}%")

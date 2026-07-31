@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasMedicineSnapshot;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SaleItem extends Model
 {
-    use HasFactory;
+    use HasFactory, HasMedicineSnapshot;
 
     /**
      * The attributes that are mass assignable.
@@ -63,7 +64,7 @@ class SaleItem extends Model
      */
     public function medicine(): BelongsTo
     {
-        return $this->belongsTo(Medicine::class);
+        return $this->snapshotMedicineRelation();
     }
 
     /**

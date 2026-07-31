@@ -1005,9 +1005,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         handleRowMetaInput(row) {
-            if (! this.rowReadyForCompanion(row)) {
-                row.is_committed = false;
-            }
+            row.is_committed = row.is_saved === true || this.rowReadyForCompanion(row);
         },
 
         handleBatchInput(row) {
@@ -2672,9 +2670,11 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('openingStockSetupForm', (config = {}) => ({
         locationOptions: Array.isArray(config.locationOptions) ? config.locationOptions : [],
         selectedLocationId: String(config.initialLocationId ?? ''),
+        defaultExpiryDate: String(config.defaultExpiryDate ?? ''),
         rows: [],
         nextDynamicRowId: 1,
         searchTerm: '',
+        activeSubmitRowKey: '',
 
         init() {
             const initialRows = Array.isArray(config.initialRows) ? config.initialRows : [];
@@ -2694,6 +2694,9 @@ document.addEventListener('alpine:init', () => {
                 medicine_code: row.medicine_code ?? '',
                 medicine_name: row.medicine_name ?? '',
                 small_unit: row.small_unit ?? '',
+                is_active: row.is_active === true,
+                is_saved: row.is_saved === true,
+                opening_item_id: String(row.opening_item_id ?? ''),
                 storage_location_id: String(row.storage_location_id ?? this.selectedLocationId ?? ''),
                 batch_number: row.batch_number ?? '',
                 expiry_date: row.expiry_date ?? '',
@@ -2712,9 +2715,12 @@ document.addEventListener('alpine:init', () => {
                 medicine_code: '',
                 medicine_name: '',
                 small_unit: '',
+                is_active: false,
+                is_saved: false,
+                opening_item_id: '',
                 storage_location_id: this.selectedLocationId,
                 batch_number: '',
-                expiry_date: '',
+                expiry_date: this.defaultExpiryDate,
                 quantity: '',
                 purchase_price: '',
                 selling_price: '',
@@ -2735,10 +2741,19 @@ document.addEventListener('alpine:init', () => {
             if (rawValue === '') {
                 row[field] = '';
             } else {
-                row[field] = String(Math.max(toNumber(rawValue, 0), 0));
+                row[field] = String(Math.floor(Math.max(toNumber(rawValue, 0), 0)));
             }
 
+            this.activeSubmitRowKey = row.key;
             this.handleRowInput(index);
+        },
+
+        markRowForSubmit(index) {
+            const row = this.rows[index];
+
+            if (row) {
+                this.activeSubmitRowKey = row.key;
+            }
         },
 
         handleRowInput(index) {
@@ -2756,17 +2771,19 @@ document.addEventListener('alpine:init', () => {
         rowIsBlank(row) {
             return String(row.batch_number ?? '').trim() === ''
                 && String(row.expiry_date ?? '').trim() === ''
-                && String(row.quantity ?? '').trim() === ''
-                && String(row.selling_price ?? '').trim() === '';
+                && String(row.quantity ?? '').trim() === '';
         },
 
         rowIsUsed(row) {
             return ! this.rowIsBlank(row);
         },
 
+        rowShouldSubmit(row) {
+            return String(row.key ?? '') === String(this.activeSubmitRowKey ?? '');
+        },
+
         rowReadyForCompanion(row) {
             return String(row.medicine_id ?? '').trim() !== ''
-                && String(row.batch_number ?? '').trim() !== ''
                 && toNumber(row.quantity, 0) > 0;
         },
 
@@ -2794,10 +2811,7 @@ document.addEventListener('alpine:init', () => {
                     ].some((value) => String(value ?? '').toLocaleLowerCase('id-ID').includes(query));
                 });
 
-            const committedRows = matchedRows.filter(({ row }) => row.is_committed && this.rowIsUsed(row));
-            const otherRows = matchedRows.filter(({ row }) => ! (row.is_committed && this.rowIsUsed(row)));
-
-            return [...committedRows, ...otherRows];
+            return matchedRows;
         },
 
         lastRowIndexForMedicine(medicineId) {
@@ -2889,6 +2903,7 @@ document.addEventListener('alpine:init', () => {
                     medicine_code: sourceRow.medicine_code ?? '',
                     medicine_name: sourceRow.medicine_name ?? '',
                     small_unit: sourceRow.small_unit ?? '',
+                    is_active: sourceRow.is_active === true,
                     storage_location_id: this.selectedLocationId,
                     purchase_price: String(sourceRow.purchase_price ?? ''),
                     selling_price: String(sourceRow.selling_price ?? ''),
@@ -2914,7 +2929,9 @@ document.addEventListener('alpine:init', () => {
             const locationId = String(this.selectedLocationId ?? '');
 
             this.rows.forEach((row) => {
-                row.storage_location_id = locationId;
+                if (! row.is_saved) {
+                    row.storage_location_id = locationId;
+                }
             });
         },
 

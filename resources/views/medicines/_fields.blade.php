@@ -256,7 +256,7 @@
         <textarea
             id="{{ $fieldPrefix }}composition"
             name="composition"
-            rows="2"
+            rows="1"
             placeholder="Contoh: Tiap tablet mengandung Paracetamol 500 mg."
             class="w-full rounded-[1.35rem] border border-slate-200 bg-slate-50 px-4 py-2 text-sm leading-6 text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-100"
         >{{ old('composition', $medicine->composition) }}</textarea>
