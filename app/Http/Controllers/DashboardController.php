@@ -162,7 +162,7 @@ class DashboardController extends Controller
                     'label' => 'Hutang supplier',
                     'value' => $this->formatCurrency($payableOutstanding),
                     'meta' => 'Tagihan belum lunas',
-                    'href' => route('pembelian.hutang-supplier'),
+                    'href' => route('keuangan.pembayaran-hutang'),
                 ],
             ],
             'inventoryCards' => [
