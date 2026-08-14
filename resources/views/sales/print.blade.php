@@ -60,6 +60,13 @@
             margin: 0;
         }
 
+        .document-date {
+            color: #475569;
+            font-size: 10.8px;
+            text-align: right;
+            margin: 2px 0 0;
+        }
+
         .separator {
             border-top: 2px solid #64748b;
             margin: 8px 0 10px;
@@ -114,6 +121,10 @@
             font-size: 10.8px;
             font-weight: 700;
             text-transform: uppercase;
+        }
+
+        table.items td.batch-value {
+            font-size: 9px;
         }
 
         table.items td {
@@ -215,6 +226,7 @@
             <td width="40%">
                 <p class="document-title">Faktur Penjualan</p>
                 <p class="document-number">{{ $sale->sale_number }}</p>
+                <p class="document-date">{{ $sale->sale_date?->translatedFormat('d/m/Y') ?? '-' }}</p>
             </td>
         </tr>
     </table>
@@ -226,22 +238,6 @@
             <td class="meta-label">Terima Dari</td>
             <td class="meta-separator">:</td>
             <td class="meta-value">{{ $sale->customer_name ?: '-' }}</td>
-            <td class="meta-label">Tanggal Cetak</td>
-            <td class="meta-separator">:</td>
-            <td class="meta-value">{{ $printedAt->translatedFormat('d/m/Y H:i') }}</td>
-        </tr>
-        <tr>
-            <td class="meta-label">Alamat</td>
-            <td class="meta-separator">:</td>
-            <td class="meta-value">{{ $customerAddress }}</td>
-            <td class="meta-label">Tanggal Faktur</td>
-            <td class="meta-separator">:</td>
-            <td class="meta-value">{{ $sale->sale_date?->translatedFormat('d/m/Y') ?? '-' }}</td>
-        </tr>
-        <tr>
-            <td class="meta-label">Metode</td>
-            <td class="meta-separator">:</td>
-            <td class="meta-value">{{ $paymentMethodLabel }}</td>
             <td class="meta-label">Jatuh Tempo</td>
             <td class="meta-separator">:</td>
             <td class="meta-value">-</td>
@@ -266,7 +262,7 @@
                 <tr>
                     <td class="text-center">{{ $index + 1 }}</td>
                     <td>{{ $item['medicine_name'] }}</td>
-                    <td>{{ $item['batch_number'] ?: '-' }}</td>
+                    <td class="batch-value text-center">{{ $item['batch_number'] ?: '-' }}</td>
                     <td class="text-center">{{ number_format((float) $item['quantity'], 0, ',', '.') }}</td>
                     <td class="text-center">{{ $item['unit_name'] }}</td>
                     <td class="text-right">Rp {{ number_format((float) $item['unit_price'], 0, ',', '.') }}</td>
