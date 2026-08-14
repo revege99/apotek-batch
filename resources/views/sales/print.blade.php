@@ -113,13 +113,13 @@
         table.items th,
         table.items td {
             border: 1px solid #dbe4ee;
-            padding: 5px 6px;
         }
 
         table.items th {
             background: #f1f5f9;
             font-size: 10.8px;
             font-weight: 700;
+            padding: 5px 6px;
             text-transform: uppercase;
         }
 
@@ -129,6 +129,8 @@
 
         table.items td {
             font-size: 11px;
+            line-height: 1.1;
+            padding: 2px 6px;
         }
 
         .text-right {
@@ -165,7 +167,7 @@
         }
 
         .summary td {
-            padding: 2px 0;
+            padding: 1px 0;
             font-size: 11px;
         }
 
