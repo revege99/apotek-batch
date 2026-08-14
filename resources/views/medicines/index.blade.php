@@ -278,6 +278,12 @@
                 </table>
             </div>
 
+            @if ($medicines->hasPages())
+                <div class="border-t border-slate-200/80 px-6 py-4">
+                    {{ $medicines->links() }}
+                </div>
+            @endif
+
             @include('components.master-delete-modal')
         </section>
 

@@ -20,7 +20,6 @@ class MedicineUnit extends Model
      */
     protected $fillable = [
         'code',
-        'unit_type',
         'name',
         'description',
         'is_active',
@@ -36,14 +35,6 @@ class MedicineUnit extends Model
         return [
             'is_active' => 'boolean',
         ];
-    }
-
-    /**
-     * Filter the query to a specific unit type.
-     */
-    public function scopeForUnitType(Builder $query, string $unitType): Builder
-    {
-        return $query->where('unit_type', $unitType);
     }
 
     /**

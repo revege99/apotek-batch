@@ -47,12 +47,6 @@
                         <span class="inline-flex items-center rounded-full bg-slate-100 px-4 py-2 text-[0.78rem] font-medium text-slate-700">
                             {{ number_format($stats['active']) }} aktif
                         </span>
-                        <span class="inline-flex items-center rounded-full bg-slate-100 px-4 py-2 text-[0.78rem] font-medium text-slate-700">
-                            {{ number_format($stats['large']) }} satuan besar
-                        </span>
-                        <span class="inline-flex items-center rounded-full bg-slate-100 px-4 py-2 text-[0.78rem] font-medium text-slate-700">
-                            {{ number_format($stats['small']) }} satuan kecil
-                        </span>
                     </div>
 
                     <form method="GET" action="{{ route('master-data.satuan-obat') }}" class="flex flex-wrap items-center justify-end gap-2">
@@ -67,20 +61,6 @@
                             class="ui-control"
                             @input.debounce.350ms="$el.form?.requestSubmit()"
                         >
-                        </div>
-
-                        <div class="w-[150px] shrink-0">
-                        <label for="unit_type" class="sr-only">Tipe</label>
-                        <select
-                            id="unit_type"
-                            name="unit_type"
-                            class="ui-select-control"
-                        >
-                            <option value="all" @selected($unitType === 'all')>Semua tipe</option>
-                            @foreach ($typeOptions as $value => $label)
-                                <option value="{{ $value }}" @selected($unitType === $value)>{{ $label }}</option>
-                            @endforeach
-                        </select>
                         </div>
 
                         <div class="w-[145px] shrink-0">
@@ -111,7 +91,6 @@
                     <thead>
                         <tr class="text-left text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-400">
                             <th class="px-4 py-2.5">Kode</th>
-                            <th class="px-4 py-2.5">Tipe</th>
                             <th class="px-4 py-2.5">Nama</th>
                             <th class="px-4 py-2.5">Deskripsi</th>
                             <th class="px-4 py-2.5">Status</th>
@@ -123,13 +102,6 @@
                             <tr class="align-middle">
                                 <td class="px-4 py-2.5">
                                     <div class="flex min-h-8 items-center font-semibold text-slate-900">{{ $item->code }}</div>
-                                </td>
-                                <td class="px-4 py-2.5">
-                                    <div class="flex min-h-8 items-center">
-                                        <span class="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-                                            {{ $typeOptions[$item->unit_type] ?? $item->unit_type }}
-                                        </span>
-                                    </div>
                                 </td>
                                 <td class="px-4 py-2.5">
                                     <div class="flex min-h-8 items-center font-semibold text-slate-900">{{ $item->name }}</div>
@@ -221,11 +193,11 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="px-5 py-14 text-center">
+                                <td colspan="5" class="px-5 py-14 text-center">
                                     <div class="mx-auto max-w-md space-y-3">
                                         <div class="empty-title">Belum ada master satuan obat</div>
                                         <p class="content-copy">
-                                            Tambah item pertama untuk mulai mengisi satuan besar dan satuan kecil pada form data obat.
+                                            Tambah item pertama agar dapat dipilih sebagai satuan besar maupun satuan kecil pada form data obat.
                                         </p>
                                         <button
                                             type="button"
@@ -288,19 +260,6 @@
                     <form method="POST" action="{{ route('master-data.satuan-obat.store') }}" class="mt-6 space-y-4">
                         @csrf
                         <input type="hidden" name="_modal" value="create">
-
-                        <div class="space-y-2">
-                            <label for="create_unit_type" class="text-sm font-semibold text-slate-800">Tipe master</label>
-                            <select
-                                id="create_unit_type"
-                                name="unit_type"
-                                class="ui-select-control"
-                            >
-                                @foreach ($typeOptions as $value => $label)
-                                    <option value="{{ $value }}" @selected(old('unit_type') === $value)>{{ $label }}</option>
-                                @endforeach
-                            </select>
-                        </div>
 
                         <div class="space-y-2">
                             <label for="create_name" class="text-sm font-semibold text-slate-800">Nama</label>
@@ -401,19 +360,6 @@
                             @method('PATCH')
                             <input type="hidden" name="_modal" value="edit">
                             <input type="hidden" name="_edit_id" value="{{ $editingUnit->id }}">
-
-                            <div class="space-y-2">
-                                <label for="edit_unit_type" class="text-sm font-semibold text-slate-800">Tipe master</label>
-                                <select
-                                    id="edit_unit_type"
-                                    name="unit_type"
-                                    class="ui-select-control ui-control--sky"
-                                >
-                                    @foreach ($typeOptions as $value => $label)
-                                        <option value="{{ $value }}" @selected(old('unit_type', $editingUnit->unit_type) === $value)>{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
 
                             <div class="space-y-2">
                                 <label for="edit_name" class="text-sm font-semibold text-slate-800">Nama</label>

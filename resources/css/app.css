@@ -33,21 +33,6 @@
         }
     }
 
-    @keyframes app-loading-spin {
-        to {
-            transform: rotate(360deg);
-        }
-    }
-
-    @keyframes app-loading-slide {
-        0% {
-            transform: translateX(-45%);
-        }
-
-        100% {
-            transform: translateX(140%);
-        }
-    }
 }
 
 @layer components {
@@ -160,32 +145,6 @@
 
     .ui-action-btn--soft {
         @apply border-slate-200 bg-white text-slate-800 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700;
-    }
-
-    .app-loading-shell {
-        @apply fixed inset-0 z-[120] flex items-center justify-center backdrop-blur-[2px];
-        background-color: rgba(2, 6, 23, 0.22);
-    }
-
-    .app-loading-card {
-        @apply relative flex w-[min(22rem,calc(100vw-2rem))] items-center gap-3 overflow-hidden rounded-2xl border px-4 py-3 shadow-[0_24px_50px_-24px_rgba(15,23,42,0.45)];
-        border-color: rgba(255, 255, 255, 0.8);
-        background-color: rgba(255, 255, 255, 0.96);
-    }
-
-    .app-loading-spinner {
-        @apply relative h-10 w-10 shrink-0 rounded-full border-2 border-slate-200 border-t-emerald-500 bg-white;
-        animation: app-loading-spin 0.75s linear infinite;
-    }
-
-    .app-loading-bar {
-        @apply absolute inset-x-0 bottom-0 h-1 overflow-hidden bg-slate-100;
-    }
-
-    .app-loading-bar::after {
-        content: '';
-        @apply absolute inset-y-0 left-0 w-24 rounded-full bg-gradient-to-r from-emerald-400 via-sky-400 to-emerald-400;
-        animation: app-loading-slide 1.1s ease-in-out infinite;
     }
 
     .purchase-detail-control {

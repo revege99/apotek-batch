@@ -1,3 +1,35 @@
+@php
+    $brandTitle = config('app.name') === 'Laravel'
+        ? config('apotik.brand.name')
+        : config('app.name', config('apotik.brand.name'));
+    $pageTitle = trim(collect([
+        $section ?? null,
+        data_get($page ?? [], 'label'),
+    ])->filter()->implode(' - '));
+    $documentTitle = $pageTitle !== '' ? $pageTitle.' | '.$brandTitle : $brandTitle;
+    $isPartialRequest = request()->header('X-Apotik-Partial') === 'main-content';
+@endphp
+
+@if ($isPartialRequest)
+<!DOCTYPE html>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+    <head>
+        <meta charset="utf-8">
+        <title>{{ $documentTitle }}</title>
+    </head>
+    <body>
+        <main>
+            @isset($header)
+                <header class="mb-5">
+                    {{ $header }}
+                </header>
+            @endisset
+
+            {{ $slot }}
+        </main>
+    </body>
+</html>
+@else
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
@@ -5,17 +37,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        @php
-            $brandTitle = config('app.name') === 'Laravel'
-                ? config('apotik.brand.name')
-                : config('app.name', config('apotik.brand.name'));
-            $pageTitle = trim(collect([
-                $section ?? null,
-                data_get($page ?? [], 'label'),
-            ])->filter()->implode(' - '));
-        @endphp
-
-        <title>{{ $pageTitle !== '' ? $pageTitle.' | '.$brandTitle : $brandTitle }}</title>
+        <title>{{ $documentTitle }}</title>
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
@@ -26,17 +48,6 @@
     </head>
     <body class="h-screen overflow-hidden font-sans antialiased">
         <div x-data="layoutShell" class="h-screen overflow-hidden">
-            <div x-data x-cloak x-show="$store.loadingState.active" x-transition.opacity.duration.150ms class="app-loading-shell">
-                <div class="app-loading-card">
-                    <div class="app-loading-spinner"></div>
-                    <div class="min-w-0">
-                        <p class="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-emerald-600">Loading</p>
-                        <p class="mt-1 truncate text-sm font-medium text-slate-700" x-text="$store.loadingState.message"></p>
-                    </div>
-                    <div class="app-loading-bar"></div>
-                </div>
-            </div>
-
             <div class="pointer-events-none fixed right-4 top-4 z-[70] w-full max-w-sm sm:right-6 sm:top-6">
                 @include('layouts.toast')
             </div>
@@ -91,3 +102,4 @@
         </div>
     </body>
 </html>
+@endif

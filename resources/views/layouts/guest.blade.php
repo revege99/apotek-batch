@@ -19,17 +19,6 @@
     @endphp
     <body class="font-sans antialiased">
         <div class="relative min-h-screen overflow-hidden bg-slate-950">
-            <div x-data x-cloak x-show="$store.loadingState.active" x-transition.opacity.duration.150ms class="app-loading-shell">
-                <div class="app-loading-card">
-                    <div class="app-loading-spinner"></div>
-                    <div class="min-w-0">
-                        <p class="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-emerald-600">Loading</p>
-                        <p class="mt-1 truncate text-sm font-medium text-slate-700" x-text="$store.loadingState.message"></p>
-                    </div>
-                    <div class="app-loading-bar"></div>
-                </div>
-            </div>
-
             <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.28),_transparent_24%),radial-gradient(circle_at_bottom_right,_rgba(14,165,233,0.22),_transparent_30%),linear-gradient(135deg,_#020617_0%,_#0f172a_45%,_#082f49_100%)]"></div>
             @unless ($isLoginPage)
                 <div class="absolute inset-y-0 left-0 hidden w-1/2 bg-[radial-gradient(circle_at_20%_20%,_rgba(255,255,255,0.12),_transparent_22%),radial-gradient(circle_at_70%_30%,_rgba(16,185,129,0.16),_transparent_25%),radial-gradient(circle_at_40%_70%,_rgba(56,189,248,0.14),_transparent_28%)] lg:block"></div>

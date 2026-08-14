@@ -25,10 +25,27 @@ class MedicineController extends Controller
         $status = trim((string) $request->string('status', 'all'));
         $editId = $request->integer('edit') ?: (int) $request->session()->getOldInput('_edit_id');
         $editingMedicine = $editId ? Medicine::query()->with('principal:id,name')->find($editId) : null;
-        $formOptions = $this->formOptions();
+        $formOptions = $this->formOptions($editingMedicine?->principal_id);
         $newMedicine = $this->newMedicine();
 
         $medicines = Medicine::query()
+            ->select([
+                'id',
+                'code',
+                'name',
+                'medicine_type',
+                'category_name',
+                'medicine_group',
+                'large_unit',
+                'small_unit',
+                'small_unit_per_large_unit',
+                'minimum_stock',
+                'composition',
+                'purchase_price',
+                'principal_id',
+                'is_active',
+                'created_at',
+            ])
             ->with('principal:id,name')
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($innerQuery) use ($search) {
@@ -47,7 +64,15 @@ class MedicineController extends Controller
             ->when($status === 'active', fn ($query) => $query->where('is_active', true))
             ->when($status === 'inactive', fn ($query) => $query->where('is_active', false))
             ->orderBy('name')
-            ->get();
+            ->paginate(25)
+            ->withQueryString();
+
+        $stats = Medicine::query()
+            ->selectRaw('COUNT(*) as total')
+            ->selectRaw('SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active')
+            ->selectRaw('COUNT(DISTINCT CASE WHEN principal_id IS NOT NULL THEN principal_id END) as principal_count')
+            ->selectRaw("SUM(CASE WHEN composition IS NOT NULL AND composition != '' THEN 1 ELSE 0 END) as composition_count")
+            ->first();
 
         return view('medicines.index', [
             ...$this->pageData(),
@@ -62,13 +87,13 @@ class MedicineController extends Controller
             'smallUnitSuggestions' => $formOptions['smallUnitSuggestions'],
             'newMedicine' => $newMedicine,
             'editingMedicine' => $editingMedicine,
-            'editFormOptions' => $editingMedicine ? $this->formOptions($editingMedicine->principal_id) : null,
+            'editFormOptions' => $editingMedicine ? $formOptions : null,
             'selectedPrincipalId' => null,
             'stats' => [
-                'total' => Medicine::count(),
-                'active' => Medicine::where('is_active', true)->count(),
-                'principal_count' => Medicine::query()->whereNotNull('principal_id')->distinct('principal_id')->count('principal_id'),
-                'composition_count' => Medicine::query()->whereNotNull('composition')->where('composition', '!=', '')->count(),
+                'total' => (int) ($stats?->total ?? 0),
+                'active' => (int) ($stats?->active ?? 0),
+                'principal_count' => (int) ($stats?->principal_count ?? 0),
+                'composition_count' => (int) ($stats?->composition_count ?? 0),
             ],
         ]);
     }
@@ -227,60 +252,60 @@ class MedicineController extends Controller
      */
     private function formOptions(?int $selectedPrincipalId = null): array
     {
+        $categoryOptions = MedicineCategory::query()
+            ->whereIn('classification_type', [
+                MedicineCategory::TYPE_MEDICINE_TYPE,
+                MedicineCategory::TYPE_CATEGORY,
+                MedicineCategory::TYPE_GROUP,
+            ])
+            ->active()
+            ->orderBy('name')
+            ->get(['classification_type', 'name'])
+            ->groupBy('classification_type');
+
+        $unitOptions = MedicineUnit::query()
+            ->active()
+            ->orderBy('name')
+            ->pluck('name');
+
+        $medicineValues = Medicine::query()
+            ->get(['medicine_type', 'category_name', 'medicine_group', 'large_unit', 'small_unit']);
+
+        $unitSuggestions = $unitOptions
+            ->merge($medicineValues->pluck('large_unit'))
+            ->merge($medicineValues->pluck('small_unit'))
+            ->filter()
+            ->unique(fn (string $value): string => Str::lower($value))
+            ->values();
+
         return [
             'principalOptions' => $this->principalOptions($selectedPrincipalId),
-            'typeSuggestions' => $this->medicineCategorySuggestions(MedicineCategory::TYPE_MEDICINE_TYPE, 'medicine_type'),
-            'categorySuggestions' => $this->medicineCategorySuggestions(MedicineCategory::TYPE_CATEGORY, 'category_name'),
-            'groupSuggestions' => $this->medicineCategorySuggestions(MedicineCategory::TYPE_GROUP, 'medicine_group'),
-            'largeUnitSuggestions' => $this->medicineUnitSuggestions(MedicineUnit::TYPE_LARGE, 'large_unit'),
-            'smallUnitSuggestions' => $this->medicineUnitSuggestions(MedicineUnit::TYPE_SMALL, 'small_unit'),
+            'typeSuggestions' => $this->mergeSuggestions($categoryOptions->get(MedicineCategory::TYPE_MEDICINE_TYPE, collect()), $medicineValues, 'medicine_type'),
+            'categorySuggestions' => $this->mergeSuggestions($categoryOptions->get(MedicineCategory::TYPE_CATEGORY, collect()), $medicineValues, 'category_name'),
+            'groupSuggestions' => $this->mergeSuggestions($categoryOptions->get(MedicineCategory::TYPE_GROUP, collect()), $medicineValues, 'medicine_group'),
+            'largeUnitSuggestions' => $unitSuggestions,
+            'smallUnitSuggestions' => $unitSuggestions,
         ];
     }
 
     /**
-     * Get medicine classifications from master data, with existing values as fallback.
+     * Merge master values with a small set of values already used by medicines.
      */
-    private function medicineCategorySuggestions(string $classificationType, string $fallbackField): Collection
+    private function mergeSuggestions(Collection $masterOptions, Collection $medicineValues, string $field): Collection
     {
-        return MedicineCategory::query()
-            ->forClassificationType($classificationType)
-            ->active()
-            ->orderBy('name')
+        $fallbackOptions = $medicineValues
+            ->pluck($field)
+            ->filter()
+            ->unique(fn (string $value): string => Str::lower($value))
+            ->sortBy(fn (string $value): string => Str::lower($value))
+            ->take(20);
+
+        return $masterOptions
             ->pluck('name')
-            ->merge($this->medicineFieldSuggestions($fallbackField))
+            ->merge($fallbackOptions)
             ->filter()
             ->unique(fn (string $value): string => Str::lower($value))
             ->values();
-    }
-
-    /**
-     * Get medicine units from master data, with existing values as fallback.
-     */
-    private function medicineUnitSuggestions(string $unitType, string $fallbackField): Collection
-    {
-        return MedicineUnit::query()
-            ->forUnitType($unitType)
-            ->active()
-            ->orderBy('name')
-            ->pluck('name')
-            ->merge($this->medicineFieldSuggestions($fallbackField))
-            ->filter()
-            ->unique(fn (string $value): string => Str::lower($value))
-            ->values();
-    }
-
-    /**
-     * Get a distinct suggestion list from an existing medicine field.
-     */
-    private function medicineFieldSuggestions(string $field): Collection
-    {
-        return Medicine::query()
-            ->whereNotNull($field)
-            ->where($field, '!=', '')
-            ->distinct()
-            ->orderBy($field)
-            ->limit(20)
-            ->pluck($field);
     }
 
     /**
@@ -300,20 +325,14 @@ class MedicineController extends Controller
      */
     private function nextMedicineCode(): string
     {
-        $nextNumber = Medicine::query()
-            ->pluck('code')
-            ->map(function (?string $code): int {
-                if (! is_string($code)) {
-                    return 0;
-                }
+        $latestCode = Medicine::query()
+            ->where('code', 'like', 'oba%')
+            ->orderByDesc('code')
+            ->value('code');
 
-                if (! preg_match('/^oba(\d+)$/i', $code, $matches)) {
-                    return 0;
-                }
-
-                return (int) $matches[1];
-            })
-            ->max() + 1;
+        $nextNumber = is_string($latestCode) && preg_match('/^oba(\d+)$/i', $latestCode, $matches)
+            ? ((int) $matches[1]) + 1
+            : 1;
 
         do {
             $candidate = sprintf('oba%07d', $nextNumber);

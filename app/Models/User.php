@@ -58,9 +58,18 @@ class User extends Authenticatable
     {
         $roleCodes = is_array($roles) ? $roles : [$roles];
 
-        return $this->roles()
-            ->whereIn('code', $roleCodes)
-            ->exists();
+        return $this->roleCodes()->intersect($roleCodes)->isNotEmpty();
+    }
+
+    /**
+     * Resolve role codes once for the lifetime of the current user instance.
+     */
+    public function roleCodes(): Collection
+    {
+        return once(fn (): Collection => $this->roles()
+            ->pluck('roles.code')
+            ->unique()
+            ->values());
     }
 
     /**
@@ -68,7 +77,7 @@ class User extends Authenticatable
      */
     public function isSuperadmin(): bool
     {
-        return $this->hasRole('superadmin');
+        return $this->roleCodes()->contains('superadmin');
     }
 
     /**

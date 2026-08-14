@@ -7,7 +7,6 @@ use App\Models\MedicineUnit;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 
 class MedicineUnitController extends Controller
 {
@@ -18,7 +17,6 @@ class MedicineUnitController extends Controller
     {
         $search = trim((string) $request->string('search'));
         $status = trim((string) $request->string('status', 'all'));
-        $unitType = trim((string) $request->string('unit_type', 'all'));
         $editId = $request->integer('edit') ?: (int) $request->session()->getOldInput('_edit_id');
 
         $items = MedicineUnit::query()
@@ -32,11 +30,6 @@ class MedicineUnitController extends Controller
             })
             ->when($status === 'active', fn ($query) => $query->where('is_active', true))
             ->when($status === 'inactive', fn ($query) => $query->where('is_active', false))
-            ->when(
-                in_array($unitType, $this->typeOptions()->keys()->all(), true),
-                fn ($query) => $query->forUnitType($unitType)
-            )
-            ->orderBy('unit_type')
             ->orderBy('name')
             ->paginate(10)
             ->withQueryString();
@@ -46,14 +39,10 @@ class MedicineUnitController extends Controller
             'items' => $items,
             'search' => $search,
             'status' => in_array($status, ['all', 'active', 'inactive'], true) ? $status : 'all',
-            'unitType' => in_array($unitType, array_merge(['all'], $this->typeOptions()->keys()->all()), true) ? $unitType : 'all',
-            'typeOptions' => $this->typeOptions(),
             'editingUnit' => $editId ? MedicineUnit::query()->find($editId) : null,
             'stats' => [
                 'total' => MedicineUnit::count(),
                 'active' => MedicineUnit::where('is_active', true)->count(),
-                'large' => MedicineUnit::forUnitType(MedicineUnit::TYPE_LARGE)->count(),
-                'small' => MedicineUnit::forUnitType(MedicineUnit::TYPE_SMALL)->count(),
             ],
         ]);
     }
@@ -66,8 +55,7 @@ class MedicineUnitController extends Controller
         $validated = $request->validated();
 
         MedicineUnit::query()->create([
-            'code' => $this->nextCode($validated['unit_type']),
-            'unit_type' => $validated['unit_type'],
+            'code' => $this->nextCode(),
             'name' => $validated['name'],
             'description' => $validated['description'] ?: null,
             'is_active' => $request->boolean('is_active', true),
@@ -89,7 +77,6 @@ class MedicineUnitController extends Controller
         $validated = $request->validated();
 
         $medicineUnit->update([
-            'unit_type' => $validated['unit_type'],
             'name' => $validated['name'],
             'description' => $validated['description'] ?: null,
             'is_active' => $request->boolean('is_active'),
@@ -139,31 +126,11 @@ class MedicineUnitController extends Controller
     }
 
     /**
-     * Get the available unit types.
-     *
-     * @return \Illuminate\Support\Collection<string, string>
+     * Generate the next general unit code.
      */
-    private function typeOptions(): Collection
+    private function nextCode(): string
     {
-        return collect([
-            MedicineUnit::TYPE_LARGE => 'Satuan Besar',
-            MedicineUnit::TYPE_SMALL => 'Satuan Kecil',
-        ]);
-    }
-
-    /**
-     * Generate the next code for the given type.
-     */
-    private function nextCode(string $unitType): string
-    {
-        $prefixes = [
-            MedicineUnit::TYPE_LARGE => 'SBR',
-            MedicineUnit::TYPE_SMALL => 'SKC',
-        ];
-
-        $prefix = $prefixes[$unitType] ?? 'SAT';
         $nextNumber = MedicineUnit::query()
-            ->forUnitType($unitType)
             ->pluck('code')
             ->map(function (?string $code): int {
                 if (! is_string($code) || ! preg_match('/(\d+)$/', $code, $matches)) {
@@ -175,7 +142,7 @@ class MedicineUnitController extends Controller
             ->max() + 1;
 
         do {
-            $candidate = sprintf('%s%04d', $prefix, $nextNumber);
+            $candidate = sprintf('SAT%04d', $nextNumber);
             $nextNumber++;
         } while (MedicineUnit::query()->where('code', $candidate)->exists());
 
