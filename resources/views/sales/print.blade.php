@@ -140,10 +140,28 @@
         }
 
         .summary {
-            width: 44%;
-            margin-left: auto;
+            width: 100%;
+            margin: 0;
+            border-collapse: collapse;
+        }
+
+        .summary-layout {
+            width: 100%;
             margin-top: 6px;
             border-collapse: collapse;
+        }
+
+        .summary-layout > tbody > tr > td {
+            vertical-align: top;
+        }
+
+        .summary-spellout {
+            width: 56%;
+            padding-right: 12px;
+        }
+
+        .summary-detail {
+            width: 44%;
         }
 
         .summary td {
@@ -164,11 +182,11 @@
         }
 
         .spellout-box {
-            margin-top: 10px;
+            margin: 0;
             border: 1px solid #cbd5e1;
             min-height: 34px;
             padding: 6px 8px;
-            width: 62%;
+            width: 100%;
         }
 
         .spellout-title {
@@ -273,53 +291,60 @@
         </tbody>
     </table>
 
-    <table class="summary">
+    <table class="summary-layout">
         <tr>
-            <td class="summary-label">TOTAL ITEM</td>
-            <td class="summary-value">Rp {{ number_format((float) $sale->subtotal, 0, ',', '.') }}</td>
-        </tr>
-        @if ((float) $sale->other_cost_amount > 0)
-            <tr>
-                <td class="summary-label">BIAYA LAIN-LAIN</td>
-                <td class="summary-value">Rp {{ number_format((float) $sale->other_cost_amount, 0, ',', '.') }}</td>
-            </tr>
-        @endif
-        @if ((float) $sale->social_amount > 0)
-            <tr>
-                <td class="summary-label">SOSIAL</td>
-                <td class="summary-value">Rp {{ number_format((float) $sale->social_amount, 0, ',', '.') }}</td>
-            </tr>
-        @endif
-        <tr>
-            <td class="summary-label">PPN (0%)</td>
-            <td class="summary-value">Rp {{ number_format((float) $sale->tax_amount, 0, ',', '.') }}</td>
-        </tr>
-        <tr>
-            <td class="summary-label">GRAND TOTAL</td>
-            <td class="summary-value">Rp {{ number_format((float) $sale->grand_total, 0, ',', '.') }}</td>
-        </tr>
-        <tr>
-            <td class="summary-label">BAYAR</td>
-            <td class="summary-value">Rp {{ number_format((float) $sale->paid_amount, 0, ',', '.') }}</td>
-        </tr>
-        <tr>
-            <td class="summary-label">KEMBALI</td>
-            <td class="summary-value">Rp {{ number_format((float) $sale->change_amount, 0, ',', '.') }}</td>
-        </tr>
-        <tr>
-            <td class="summary-label">Tanggal Bayar</td>
-            <td class="summary-value">-</td>
-        </tr>
-        <tr>
-            <td class="summary-label">Status</td>
-            <td class="summary-value">{{ strtoupper($paymentStatus) }}</td>
+            <td class="summary-spellout">
+                <div class="spellout-box">
+                    <div class="spellout-title">Terbilang:</div>
+                    <div>*** {{ $grandTotalWords }} ***</div>
+                </div>
+            </td>
+            <td class="summary-detail">
+                <table class="summary">
+                    <tr>
+                        <td class="summary-label">TOTAL ITEM</td>
+                        <td class="summary-value">Rp {{ number_format((float) $sale->subtotal, 0, ',', '.') }}</td>
+                    </tr>
+                    @if ((float) $sale->other_cost_amount > 0)
+                        <tr>
+                            <td class="summary-label">BIAYA LAIN-LAIN</td>
+                            <td class="summary-value">Rp {{ number_format((float) $sale->other_cost_amount, 0, ',', '.') }}</td>
+                        </tr>
+                    @endif
+                    @if ((float) $sale->social_amount > 0)
+                        <tr>
+                            <td class="summary-label">SOSIAL</td>
+                            <td class="summary-value">Rp {{ number_format((float) $sale->social_amount, 0, ',', '.') }}</td>
+                        </tr>
+                    @endif
+                    <tr>
+                        <td class="summary-label">PPN (0%)</td>
+                        <td class="summary-value">Rp {{ number_format((float) $sale->tax_amount, 0, ',', '.') }}</td>
+                    </tr>
+                    <tr>
+                        <td class="summary-label">GRAND TOTAL</td>
+                        <td class="summary-value">Rp {{ number_format((float) $sale->grand_total, 0, ',', '.') }}</td>
+                    </tr>
+                    <tr>
+                        <td class="summary-label">BAYAR</td>
+                        <td class="summary-value">Rp {{ number_format((float) $sale->paid_amount, 0, ',', '.') }}</td>
+                    </tr>
+                    <tr>
+                        <td class="summary-label">KEMBALI</td>
+                        <td class="summary-value">Rp {{ number_format((float) $sale->change_amount, 0, ',', '.') }}</td>
+                    </tr>
+                    <tr>
+                        <td class="summary-label">Tanggal Bayar</td>
+                        <td class="summary-value">-</td>
+                    </tr>
+                    <tr>
+                        <td class="summary-label">Status</td>
+                        <td class="summary-value">{{ strtoupper($paymentStatus) }}</td>
+                    </tr>
+                </table>
+            </td>
         </tr>
     </table>
-
-    <div class="spellout-box">
-        <div class="spellout-title">Terbilang:</div>
-        <div>*** {{ $grandTotalWords }} ***</div>
-    </div>
 
     <table class="footer-grid">
         <tr>
