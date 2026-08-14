@@ -268,13 +268,12 @@
         <thead>
             <tr>
                 <th width="5%">No</th>
-                <th width="33%">Nama Barang</th>
+                <th width="37%">Nama Barang</th>
                 <th width="13%">No Batch</th>
                 <th width="9%">Qty</th>
                 <th width="9%">Satuan</th>
-                <th width="12%">Harga</th>
-                <th width="8%">Disc</th>
-                <th width="11%">Subtotal</th>
+                <th width="14%">Harga</th>
+                <th width="13%">Subtotal</th>
             </tr>
         </thead>
         <tbody>
@@ -286,7 +285,6 @@
                     <td class="text-center">{{ number_format((float) $item['quantity'], 0, ',', '.') }}</td>
                     <td class="text-center">{{ $item['unit_name'] }}</td>
                     <td class="text-right">Rp {{ number_format((float) $item['unit_price'], 0, ',', '.') }}</td>
-                    <td class="text-right">Rp {{ number_format((float) $item['discount_amount'], 0, ',', '.') }}</td>
                     <td class="text-right">Rp {{ number_format((float) $item['line_total'], 0, ',', '.') }}</td>
                 </tr>
             @endforeach
