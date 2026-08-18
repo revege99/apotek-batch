@@ -90,10 +90,10 @@ return [
             'icon' => 'cog',
             'summary' => 'Area untuk menyiapkan saldo awal saat go-live aplikasi.',
             'children' => [
-                ['label' => 'Saldo Awal Stok', 'route' => 'setup-saldo-awal.stok', 'path' => 'setup-saldo-awal/stok'],
-                ['label' => 'Piutang Awal', 'route' => 'setup-saldo-awal.piutang', 'path' => 'setup-saldo-awal/piutang'],
-                ['label' => 'Hutang Awal', 'route' => 'setup-saldo-awal.hutang', 'path' => 'setup-saldo-awal/hutang'],
-                ['label' => 'Kas Awal', 'route' => 'setup-saldo-awal.kas', 'path' => 'setup-saldo-awal/kas'],
+                ['label' => 'Saldo Awal Stok', 'route' => 'setup-saldo-awal.stok', 'path' => 'setup-saldo-awal/stok', 'superadmin_only' => true],
+                ['label' => 'Piutang Awal', 'route' => 'setup-saldo-awal.piutang', 'path' => 'setup-saldo-awal/piutang', 'superadmin_only' => true],
+                ['label' => 'Hutang Awal', 'route' => 'setup-saldo-awal.hutang', 'path' => 'setup-saldo-awal/hutang', 'superadmin_only' => true],
+                ['label' => 'Kas Awal', 'route' => 'setup-saldo-awal.kas', 'path' => 'setup-saldo-awal/kas', 'superadmin_only' => true],
             ],
         ],
         [

@@ -223,8 +223,8 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-200/80 bg-white text-[0.78rem]">
-                            <template x-for="(row, index) in rows" :key="row.key">
-                                <tr x-show="rowMatchesSearch(row)" class="align-middle" :class="{ 'bg-emerald-50/30': rowIsUsed(row) }">
+                            <template x-for="item in renderedRows" :key="item.row.key">
+                                <tr x-data="{ row: item.row, index: item.index }" class="align-middle" style="content-visibility: auto; contain-intrinsic-size: 44px;" :class="{ 'bg-emerald-50/30': rowIsUsed(row) }">
                                     <td class="px-2 py-1.5">
                                         <input type="hidden" :name="rowIsUsed(row) ? `items[${index}][medicine_id]` : null" :value="row.medicine_id">
                                         <input type="hidden" :name="rowIsUsed(row) ? `items[${index}][stock_batch_id]` : null" :value="row.stock_batch_id">
@@ -242,7 +242,7 @@
                                             @change="handleBatchChange(row)"
                                             class="w-36 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[0.72rem] text-slate-900 shadow-sm transition focus:border-emerald-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
                                         >
-                                            <template x-for="batch in row.batches" :key="`${batch.id}-${stockRevision}`">
+                                            <template x-for="batch in row.batches" :key="String(batch.id)">
                                                 <option
                                                     :value="String(batch.id)"
                                                     :selected="String(row.stock_batch_id) === String(batch.id)"
@@ -311,7 +311,7 @@
                     </table>
                 </div>
 
-                <div x-show="visibleRowCount() === 0" class="border-t border-slate-200/80 px-4 py-5 text-center text-xs text-slate-500">
+                <div x-show="visibleRows.length === 0" class="border-t border-slate-200/80 px-4 py-5 text-center text-xs text-slate-500">
                     Obat tidak ditemukan.
                 </div>
 
@@ -361,6 +361,7 @@
             <input type="hidden" name="payment_method" :value="payment_method">
             <input type="hidden" name="paid_amount" :value="effectivePaidAmount()">
             <input type="hidden" name="other_cost_amount" :value="effectiveOtherCostAmount()">
+            <input type="hidden" name="due_date" :value="effectiveDueDate()">
         </form>
 
         <div
@@ -406,7 +407,18 @@
                     </div>
 
                     <div class="mt-3">
-                        <div class="grid gap-3 md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+                        <div class="grid gap-3 md:grid-cols-3">
+                            <div x-show="payment_kind === 'credit'" x-transition>
+                                <label for="sale_due_date" class="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-slate-500">Tanggal jatuh tempo</label>
+                                <input
+                                    id="sale_due_date"
+                                    type="date"
+                                    x-model="due_date"
+                                    @input="markDueDateManual()"
+                                    class="ui-control mt-2 px-3 text-[0.72rem]"
+                                >
+                                <p class="mt-1 text-[0.64rem] text-slate-400">Otomatis 25 hari dari tanggal penjualan.</p>
+                            </div>
                             <div>
                                 <label for="sale_other_cost_amount" class="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-slate-500">Biaya lain-lain</label>
                                 <input

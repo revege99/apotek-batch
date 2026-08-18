@@ -124,7 +124,8 @@
                             <th class="px-3 py-3">Tanggal</th>
                             <th class="px-3 py-3">Pelanggan</th>
                             <th class="px-3 py-3">Golongan</th>
-                            <th class="px-3 py-3">Status</th>
+                            <th class="px-3 py-3">Metode Bayar</th>
+                            <th class="px-3 py-3">Status Bayar</th>
                             <th class="px-3 py-3 text-right">Total</th>
                             <th class="px-3 py-3 text-center">Aksi</th>
                         </tr>
@@ -143,6 +144,14 @@
                                 <td class="px-3 py-3 text-slate-700">
                                     {{ $sale->customerGroup?->name ?: '-' }}
                                     <p class="mt-1 text-[0.66rem] text-emerald-600">{{ number_format((float) $sale->customer_group_markup_percentage, 2, ',', '.') }}%</p>
+                                </td>
+                                <td class="px-3 py-3">
+                                    <span @class([
+                                        'inline-flex rounded-full border px-2.5 py-1 text-[0.66rem] font-semibold uppercase tracking-[0.14em]',
+                                        $sale->payment_method_tone,
+                                    ])>
+                                        {{ $sale->payment_method_label }}
+                                    </span>
                                 </td>
                                 <td class="px-3 py-3">
                                     <span @class([
@@ -254,7 +263,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="px-5 py-14 text-center">
+                                <td colspan="8" class="px-5 py-14 text-center">
                                     <div class="mx-auto max-w-md space-y-3">
                                         <div class="empty-title">{{ $search !== '' || $dateFrom !== '' || $dateTo !== '' ? 'Penjualan tidak ditemukan' : 'Belum ada transaksi penjualan' }}</div>
                                         <p class="content-copy">
@@ -299,7 +308,9 @@
                                 <span class="px-1 text-slate-300">/</span>
                                 <span x-text="detailSale?.group_name"></span>
                                 <span class="px-1 text-slate-300">/</span>
-                                <span x-text="detailSale?.payment_status"></span>
+                                <span>Metode <strong class="font-semibold text-slate-700" x-text="detailSale?.payment_method"></strong></span>
+                                <span class="px-1 text-slate-300">/</span>
+                                <span>Status <strong class="font-semibold text-slate-700" x-text="detailSale?.payment_status"></strong></span>
                             </p>
                         </div>
 

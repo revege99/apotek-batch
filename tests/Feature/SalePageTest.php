@@ -5,13 +5,16 @@ namespace Tests\Feature;
 use Barryvdh\DomPDF\Facade\Pdf;
 use App\Models\Customer;
 use App\Models\CustomerGroup;
+use App\Models\CustomerPayment;
 use App\Models\Medicine;
+use App\Models\Permission;
 use App\Models\PharmacyProfile;
 use App\Models\Principal;
 use App\Models\Sale;
 use App\Models\StockBatch;
 use App\Models\StockMovement;
 use App\Models\User;
+use App\Support\NavigationAccess;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -28,7 +31,7 @@ class SalePageTest extends TestCase
 
     public function test_authenticated_user_can_view_cashier_sale_page(): void
     {
-        $user = User::factory()->create();
+        $user = $this->createSalesUser();
         [, $customer, $medicine] = $this->seedSellableData();
 
         $response = $this
@@ -46,7 +49,7 @@ class SalePageTest extends TestCase
 
     public function test_authenticated_user_can_view_sales_history_page(): void
     {
-        $user = User::factory()->create();
+        $user = $this->createSalesUser();
 
         $response = $this
             ->actingAs($user)
@@ -58,9 +61,106 @@ class SalePageTest extends TestCase
             ->assertSee('Kasir Penjualan');
     }
 
+    public function test_sale_edit_can_add_another_stocked_medicine(): void
+    {
+        $user = $this->createSalesUser();
+        [, $customer, $firstMedicine, $firstBatch] = $this->seedSellableData();
+
+        $this->actingAs($user)
+            ->post(route('penjualan.kasir-penjualan.store'), [
+                'sale_number' => 'PJL-EDIT-001',
+                'sale_date' => now()->format('Y-m-d\TH:i'),
+                'customer_id' => $customer->id,
+                'payment_method' => 'cash',
+                'paid_amount' => 10000,
+                'items' => [[
+                    'medicine_id' => $firstMedicine->id,
+                    'stock_batch_id' => $firstBatch->id,
+                    'quantity' => 2,
+                    'unit_cost' => 1000,
+                    'markup_percentage' => 20,
+                    'unit_price' => 1200,
+                ]],
+            ])
+            ->assertRedirect(route('penjualan.kasir-penjualan'));
+
+        $secondMedicine = Medicine::query()->create([
+            'code' => 'OBT-SAL-002',
+            'name' => 'Paracetamol 500 mg',
+            'principal_id' => $firstMedicine->principal_id,
+            'small_unit' => 'Tablet',
+            'large_unit' => 'Box',
+            'small_unit_per_large_unit' => 10,
+            'composition' => 'Paracetamol',
+            'purchase_price' => 500,
+            'is_active' => true,
+        ]);
+        StockBatch::query()->create([
+            'medicine_id' => $secondMedicine->id,
+            'purchase_invoice_item_id' => null,
+            'batch_number' => 'BATCH-SAL-02',
+            'expiry_date' => now()->addYear()->toDateString(),
+            'received_at' => now()->toDateString(),
+            'purchase_price' => 500,
+            'initial_quantity' => 20,
+            'quantity_in' => 20,
+            'quantity_out' => 0,
+            'quantity_balance' => 20,
+            'status' => 'active',
+        ]);
+
+        $sale = Sale::query()->where('sale_number', 'PJL-EDIT-001')->firstOrFail();
+        $response = $this->actingAs($user)->get(route('penjualan.data-penjualan.edit', $sale));
+
+        $response->assertOk();
+        $items = collect($response->viewData('initialForm')['items'] ?? []);
+        $firstRow = $items->first(fn (array $item): bool => (int) $item['medicine_id'] === $firstMedicine->id && (float) $item['quantity'] > 0);
+        $secondRow = $items->firstWhere('medicine_id', $secondMedicine->id);
+
+        $this->assertNotNull($firstRow);
+        $this->assertNotNull($secondRow);
+        $this->assertSame('', $secondRow['quantity']);
+        $this->assertCount(1, $items->where('medicine_id', $firstMedicine->id));
+
+        $this->actingAs($user)
+            ->patch(route('penjualan.data-penjualan.update', $sale), [
+                'sale_number' => $sale->sale_number,
+                'sale_date' => $sale->sale_date->format('Y-m-d\TH:i'),
+                'customer_id' => $customer->id,
+                'payment_kind' => 'cash',
+                'payment_method' => 'cash',
+                'paid_amount' => 10000,
+                'other_cost_amount' => 0,
+                'items' => [
+                    [
+                        'medicine_id' => $firstMedicine->id,
+                        'stock_batch_id' => $firstRow['stock_batch_id'],
+                        'quantity' => 2,
+                        'unit_cost' => $firstRow['base_unit_cost'],
+                        'markup_percentage' => 20,
+                        'unit_price' => 1200,
+                    ],
+                    [
+                        'medicine_id' => $secondMedicine->id,
+                        'stock_batch_id' => $secondRow['stock_batch_id'],
+                        'quantity' => 3,
+                        'unit_cost' => $secondRow['base_unit_cost'],
+                        'markup_percentage' => 20,
+                        'unit_price' => 600,
+                    ],
+                ],
+            ])
+            ->assertRedirect(route('penjualan.data-penjualan'));
+
+        $this->assertEqualsCanonicalizing(
+            [$firstMedicine->id, $secondMedicine->id],
+            $sale->fresh()->items()->pluck('medicine_id')->unique()->values()->all(),
+        );
+    }
+
     public function test_cashier_sale_page_groups_duplicate_batch_numbers_for_the_same_medicine(): void
     {
-        $user = User::factory()->create();
+        $user = $this->createSalesUser();
         [, , $medicine, $stockBatch] = $this->seedSellableData();
 
         $duplicateBatch = StockBatch::query()->create([
@@ -96,7 +196,7 @@ class SalePageTest extends TestCase
 
     public function test_sale_transaction_uses_customer_group_markup_and_reduces_stock(): void
     {
-        $user = User::factory()->create();
+        $user = $this->createSalesUser();
         [$customerGroup, $customer, $medicine, $stockBatch] = $this->seedSellableData();
 
         $response = $this
@@ -130,6 +230,7 @@ class SalePageTest extends TestCase
         $this->assertNotNull($sale);
         $this->assertSame('PJL-0001', $sale->sale_number);
         $this->assertEquals($customerGroup->id, $sale->customer_group_id);
+        $this->assertNull($sale->due_date);
         $this->assertEquals(20, (float) $sale->customer_group_markup_percentage);
         $this->assertEquals(4800, (float) $sale->grand_total);
         $this->assertEquals(200, (float) $sale->change_amount);
@@ -166,7 +267,7 @@ class SalePageTest extends TestCase
 
     public function test_sale_transaction_uses_master_medicine_purchase_price_for_markup_calculation(): void
     {
-        $user = User::factory()->create();
+        $user = $this->createSalesUser();
         [$customerGroup, $customer, $medicine, $stockBatch] = $this->seedSellableData();
 
         $medicine->update([
@@ -232,7 +333,7 @@ class SalePageTest extends TestCase
 
     public function test_sale_transaction_can_override_customer_group_markup_manually(): void
     {
-        $user = User::factory()->create();
+        $user = $this->createSalesUser();
         [$customerGroup, $customer, $medicine, $stockBatch] = $this->seedSellableData();
 
         $response = $this
@@ -282,7 +383,7 @@ class SalePageTest extends TestCase
 
     public function test_sale_transaction_can_split_the_same_medicine_across_multiple_batches(): void
     {
-        $user = User::factory()->create();
+        $user = $this->createSalesUser();
         [$customerGroup, $customer, $medicine, $firstBatch] = $this->seedSellableData();
 
         $secondBatch = StockBatch::query()->create([
@@ -373,9 +474,56 @@ class SalePageTest extends TestCase
         ]);
     }
 
+    public function test_sale_rejects_duplicate_rows_for_the_same_medicine_and_batch(): void
+    {
+        $user = $this->createSalesUser();
+        [, $customer, $medicine, $stockBatch] = $this->seedSellableData();
+
+        $response = $this
+            ->actingAs($user)
+            ->post(route('penjualan.kasir-penjualan.store'), [
+                'sale_number' => 'PJL-DUP-BATCH',
+                'sale_date' => now()->format('Y-m-d\TH:i'),
+                'customer_id' => $customer->id,
+                'payment_method' => 'cash',
+                'paid_amount' => 5000,
+                'items' => [
+                    [
+                        'medicine_id' => $medicine->id,
+                        'stock_batch_id' => $stockBatch->id,
+                        'quantity' => 2,
+                        'unit_cost' => 1000,
+                        'markup_percentage' => 20,
+                        'unit_price' => 1200,
+                    ],
+                    [
+                        'medicine_id' => $medicine->id,
+                        'stock_batch_id' => $stockBatch->id,
+                        'quantity' => 1,
+                        'unit_cost' => 1000,
+                        'markup_percentage' => 20,
+                        'unit_price' => 1200,
+                    ],
+                ],
+            ]);
+
+        $response
+            ->assertRedirect(route('penjualan.kasir-penjualan'))
+            ->assertSessionHas('toast', fn ($toast): bool => is_array($toast)
+                && ($toast['type'] ?? null) === 'error'
+                && str_contains((string) ($toast['message'] ?? ''), 'hanya boleh dimasukkan satu kali'));
+
+        $this->assertDatabaseMissing('sales', ['sale_number' => 'PJL-DUP-BATCH']);
+        $this->assertDatabaseHas('stock_batches', [
+            'id' => $stockBatch->id,
+            'quantity_out' => 0,
+            'quantity_balance' => 10,
+        ]);
+    }
+
     public function test_sale_transaction_can_allocate_grouped_duplicate_batch_stock_from_single_selection(): void
     {
-        $user = User::factory()->create();
+        $user = $this->createSalesUser();
         [$customerGroup, $customer, $medicine, $firstBatch] = $this->seedSellableData();
 
         $firstBatch->update([
@@ -478,7 +626,7 @@ class SalePageTest extends TestCase
 
     public function test_sales_history_detail_merges_grouped_duplicate_batch_allocations_into_one_row(): void
     {
-        $user = User::factory()->create();
+        $user = $this->createSalesUser();
         [$sale, $medicine] = $this->createSaleWithGroupedDuplicateBatchAllocations($user, 'PJL-0201');
 
         $response = $this
@@ -501,7 +649,7 @@ class SalePageTest extends TestCase
 
     public function test_sale_print_groups_duplicate_batch_allocations_into_one_row(): void
     {
-        $user = User::factory()->create();
+        $user = $this->createSalesUser();
         [$sale, $medicine] = $this->createSaleWithGroupedDuplicateBatchAllocations($user, 'PJL-0202');
 
         $fakePdf = \Mockery::mock(\Barryvdh\DomPDF\PDF::class);
@@ -509,7 +657,7 @@ class SalePageTest extends TestCase
             ->once()
             ->with('a4')
             ->andReturnSelf();
-        $fakePdf->shouldReceive('download')
+        $fakePdf->shouldReceive('stream')
             ->once()
             ->with('penjualan-PJL-0202.pdf')
             ->andReturn(response('PDF', 200, [
@@ -542,7 +690,7 @@ class SalePageTest extends TestCase
 
     public function test_sale_transaction_can_be_saved_as_credit_without_paid_amount(): void
     {
-        $user = User::factory()->create();
+        $user = $this->createSalesUser();
         [$customerGroup, $customer, $medicine, $stockBatch] = $this->seedSellableData();
 
         $response = $this
@@ -550,6 +698,7 @@ class SalePageTest extends TestCase
             ->post(route('penjualan.kasir-penjualan.store'), [
                 'sale_number' => 'PJL-0003',
                 'sale_date' => now()->format('Y-m-d\TH:i'),
+                'due_date' => '2026-09-30',
                 'customer_id' => $customer->id,
                 'payment_method' => 'credit',
                 'paid_amount' => 0,
@@ -575,6 +724,7 @@ class SalePageTest extends TestCase
         $this->assertNotNull($sale);
         $this->assertEquals($customerGroup->id, $sale->customer_group_id);
         $this->assertSame('credit', $sale->payment_method);
+        $this->assertSame('2026-09-30', $sale->due_date?->toDateString());
         $this->assertEquals(3600, (float) $sale->grand_total);
         $this->assertEquals(0, (float) $sale->paid_amount);
         $this->assertEquals(0, (float) $sale->change_amount);
@@ -584,11 +734,25 @@ class SalePageTest extends TestCase
             'quantity_out' => 3,
             'quantity_balance' => 7,
         ]);
+
+        $historyResponse = $this->actingAs($user)->get(route('penjualan.data-penjualan'));
+        $historySale = $historyResponse->viewData('sales')->getCollection()->firstWhere('id', $sale->id);
+
+        $this->assertSame('KREDIT', $historySale->payment_method_label);
+        $this->assertSame('BELUM LUNAS', $historySale->payment_status_label);
+
+        $sale->update(['paid_amount' => $sale->grand_total]);
+
+        $paidHistoryResponse = $this->actingAs($user)->get(route('penjualan.data-penjualan'));
+        $paidHistorySale = $paidHistoryResponse->viewData('sales')->getCollection()->firstWhere('id', $sale->id);
+
+        $this->assertSame('KREDIT', $paidHistorySale->payment_method_label);
+        $this->assertSame('LUNAS', $paidHistorySale->payment_status_label);
     }
 
     public function test_sale_transaction_can_be_saved_as_social_payment_without_creating_receivable(): void
     {
-        $user = User::factory()->create();
+        $user = $this->createSalesUser();
         [$customerGroup, $customer, $medicine, $stockBatch] = $this->seedSellableData();
 
         $response = $this
@@ -634,9 +798,51 @@ class SalePageTest extends TestCase
         $this->assertStringContainsString('nilai sosial', (string) $sale->notes);
     }
 
+    public function test_credit_sale_print_shows_receivable_payment_date(): void
+    {
+        $user = $this->createSalesUser();
+        [, $customer] = $this->seedSellableData();
+        $sale = Sale::query()->create([
+            'sale_number' => 'PJL-PAY-DATE',
+            'sale_date' => '2026-08-01 09:00:00',
+            'status' => 'posted',
+            'payment_method' => 'credit',
+            'customer_id' => $customer->id,
+            'customer_name' => $customer->name,
+            'subtotal' => 5000,
+            'grand_total' => 5000,
+            'paid_amount' => 5000,
+        ]);
+        CustomerPayment::query()->create([
+            'payment_number' => 'BYR-TEST-001',
+            'sale_id' => $sale->id,
+            'customer_id' => $customer->id,
+            'payment_date' => '2026-08-18',
+            'payment_method' => 'cash',
+            'amount_paid' => 5000,
+            'created_by' => $user->id,
+        ]);
+
+        $fakePdf = \Mockery::mock(\Barryvdh\DomPDF\PDF::class);
+        $fakePdf->shouldReceive('setPaper')->once()->with('a4')->andReturnSelf();
+        $fakePdf->shouldReceive('stream')->once()->andReturn(response('PDF', 200));
+        Pdf::shouldReceive('loadView')
+            ->once()
+            ->with('sales.print', \Mockery::on(function (array $data): bool {
+                $this->assertSame('18/08/2026', $data['paymentDate']?->format('d/m/Y'));
+
+                return true;
+            }))
+            ->andReturn($fakePdf);
+
+        $this->actingAs($user)
+            ->get(route('penjualan.data-penjualan.print', $sale))
+            ->assertOk();
+    }
+
     public function test_sale_history_can_download_pdf_document(): void
     {
-        $user = User::factory()->create();
+        $user = $this->createSalesUser();
         [, $customer, $medicine, $stockBatch] = $this->seedSellableData();
 
         $this
@@ -675,7 +881,7 @@ class SalePageTest extends TestCase
 
     public function test_sale_can_be_deleted_and_stock_is_restored(): void
     {
-        $user = User::factory()->create();
+        $user = $this->createSalesUser();
         [, $customer, $medicine, $stockBatch] = $this->seedSellableData();
 
         $this
@@ -861,6 +1067,23 @@ class SalePageTest extends TestCase
         $this->assertCount(2, $sale->items);
 
         return [$sale, $medicine];
+    }
+
+    private function createSalesUser(): User
+    {
+        NavigationAccess::syncPermissions();
+
+        $user = User::factory()->create();
+        $permissionIds = Permission::query()
+            ->whereIn('code', [
+                NavigationAccess::permissionCode('penjualan.kasir-penjualan'),
+                NavigationAccess::permissionCode('penjualan.data-penjualan'),
+            ])
+            ->pluck('id');
+
+        $user->permissions()->sync($permissionIds);
+
+        return $user;
     }
 
     private function activateOperationalLicense(string $expiresAt = '2030-12-31'): PharmacyProfile

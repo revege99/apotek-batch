@@ -398,6 +398,7 @@ document.addEventListener('alpine:init', () => {
             const initialItems = Array.isArray(config.items) ? config.items : [];
 
             this.rows = initialItems.map((item) => this.hydrateRow(item));
+            this.rebuildBatchUsageTotals();
             this.nextDynamicRowId = this.rows.length + 1;
             this.payment_kind = String(this.payment_method ?? '') === 'credit' ? 'credit' : 'cash';
             this.syncCatalogRows();
@@ -1092,6 +1093,8 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('saleForm', (config = {}, customerOptions = []) => ({
         sale_number: config.sale_number ?? '',
         sale_date: config.sale_date ?? '',
+        due_date: config.due_date ?? '',
+        due_date_is_manual: config.due_date_is_manual === true,
         customer_id: config.customer_id ?? '',
         customerSearch: '',
         customerDropdownOpen: false,
@@ -1104,6 +1107,10 @@ document.addEventListener('alpine:init', () => {
         notes: config.notes ?? '',
         customers: Array.isArray(customerOptions) ? customerOptions : [],
         rows: [],
+        visibleRows: [],
+        renderedRows: [],
+        renderGeneration: 0,
+        batchUsageTotals: {},
         searchTerm: '',
         nextFilledOrder: 1,
         nextDynamicRowId: 1,
@@ -1143,6 +1150,39 @@ document.addEventListener('alpine:init', () => {
             this.syncOtherCostAmountDisplay();
             this.syncPaidAmount();
             this.syncCustomerSearch();
+            this.rebuildBatchUsageTotals();
+            this.refreshVisibleRows();
+
+            this.$watch('sale_date', () => this.syncDueDateFromSaleDate());
+        },
+
+        syncDueDateFromSaleDate(force = false) {
+            if (this.due_date_is_manual && ! force) {
+                return;
+            }
+
+            const saleDate = String(this.sale_date ?? '').slice(0, 10);
+
+            if (! /^\d{4}-\d{2}-\d{2}$/.test(saleDate)) {
+                return;
+            }
+
+            const [year, month, day] = saleDate.split('-').map(Number);
+            const dueDate = new Date(year, month - 1, day);
+            dueDate.setDate(dueDate.getDate() + 25);
+            this.due_date = [
+                dueDate.getFullYear(),
+                String(dueDate.getMonth() + 1).padStart(2, '0'),
+                String(dueDate.getDate()).padStart(2, '0'),
+            ].join('-');
+        },
+
+        markDueDateManual() {
+            this.due_date_is_manual = true;
+        },
+
+        effectiveDueDate() {
+            return this.payment_kind === 'credit' ? this.due_date : '';
         },
 
         parseBooleanValue(value, fallback = false) {
@@ -1168,6 +1208,12 @@ document.addEventListener('alpine:init', () => {
                 medicine_name: item.medicine_name ?? '',
                 principal_name: item.principal_name ?? '',
                 composition: item.composition ?? '',
+                search_text: [
+                    item.medicine_code,
+                    item.medicine_name,
+                    item.principal_name,
+                    item.composition,
+                ].map((value) => String(value ?? '').toLocaleLowerCase('id-ID')).join(' '),
                 small_unit: item.small_unit ?? 'unit',
                 batches,
                 stock_batch_id: String(fallbackBatchId ?? ''),
@@ -1325,11 +1371,17 @@ document.addEventListener('alpine:init', () => {
                 this.syncBatchSelection(row);
                 row.markup_percentage = String(markupPercentage);
                 this.syncRowPricing(row, markupPercentage);
-                this.recalculateRow(row);
+
+                if (this.rowIsUsed(row)) {
+                    this.recalculateRow(row);
+                } else {
+                    row.line_total = 0;
+                }
             });
 
             this.ensureCompanionRows();
             this.syncPaidAmount();
+            this.rebuildBatchUsageTotals();
         },
 
         selectedBatch(row) {
@@ -1379,6 +1431,8 @@ document.addEventListener('alpine:init', () => {
             }
 
             this.syncPaidAmount();
+            this.rebuildBatchUsageTotals();
+            this.refreshVisibleRows();
         },
 
         handleMarkupInput(row) {
@@ -1410,6 +1464,7 @@ document.addEventListener('alpine:init', () => {
 
         setSearchTerm(value) {
             this.searchTerm = value;
+            this.refreshVisibleRows();
         },
 
         hasActiveSearch() {
@@ -1538,16 +1593,63 @@ document.addEventListener('alpine:init', () => {
                 return this.rowIsUsed(row) || this.isPrimaryPlaceholderRow(row);
             }
 
-            return [
-                row.medicine_code,
-                row.medicine_name,
-                row.principal_name,
-                row.composition,
-            ].some((value) => String(value ?? '').toLocaleLowerCase('id-ID').includes(query));
+            return row.search_text.includes(query);
         },
 
         visibleRowCount() {
-            return this.rows.filter((row) => this.rowMatchesSearch(row)).length;
+            return this.visibleRows.length;
+        },
+
+        refreshVisibleRows() {
+            const query = String(this.searchTerm ?? '').trim().toLocaleLowerCase('id-ID');
+            const primaryPlaceholderMedicineIds = new Set();
+
+            this.visibleRows = this.rows
+                .map((row, index) => ({ row, index }))
+                .filter(({ row }) => {
+                    if (query !== '') {
+                        return row.search_text.includes(query);
+                    }
+
+                    if (this.rowIsUsed(row)) {
+                        return true;
+                    }
+
+                    const medicineId = String(row.medicine_id ?? '');
+
+                    if (primaryPlaceholderMedicineIds.has(medicineId)) {
+                        return false;
+                    }
+
+                    primaryPlaceholderMedicineIds.add(medicineId);
+
+                    return true;
+                });
+
+            this.renderRowsProgressively();
+        },
+
+        renderRowsProgressively() {
+            const generation = ++this.renderGeneration;
+            const rowsToRender = this.visibleRows;
+            const batchSize = 100;
+
+            this.renderedRows = rowsToRender.slice(0, batchSize);
+
+            const appendNextBatch = () => {
+                if (generation !== this.renderGeneration || this.renderedRows.length >= rowsToRender.length) {
+                    return;
+                }
+
+                this.renderedRows.push(
+                    ...rowsToRender.slice(this.renderedRows.length, this.renderedRows.length + batchSize),
+                );
+                window.requestAnimationFrame(appendNextBatch);
+            };
+
+            if (this.renderedRows.length < rowsToRender.length) {
+                window.requestAnimationFrame(appendNextBatch);
+            }
         },
 
         batchLabel(row) {
@@ -1587,6 +1689,29 @@ document.addEventListener('alpine:init', () => {
             return `${String(row.medicine_id ?? '')}|${this.normalizedBatchNumber(batch)}`;
         },
 
+        batchUsageKey(row, batch) {
+            if (! batch) {
+                return '';
+            }
+
+            return `${String(row.medicine_id ?? '')}|${this.batchIdentity(row, batch)}`;
+        },
+
+        rebuildBatchUsageTotals() {
+            const totals = Object.create(null);
+
+            this.rows.forEach((row) => {
+                const quantity = Math.max(toNumber(row.quantity, 0), 0);
+                const key = this.batchUsageKey(row, this.selectedBatch(row));
+
+                if (quantity > 0 && key !== '') {
+                    totals[key] = roundCurrency((totals[key] ?? 0) + quantity);
+                }
+            });
+
+            this.batchUsageTotals = totals;
+        },
+
         rowsUsingBatch(row, batch, excludedRowKey = null) {
             const medicineId = String(row.medicine_id ?? '');
             const batchIdentity = this.batchIdentity(row, batch);
@@ -1606,8 +1731,18 @@ document.addEventListener('alpine:init', () => {
         },
 
         usedBatchQuantity(row, batch, excludedRowKey = null) {
-            return this.rowsUsingBatch(row, batch, excludedRowKey)
-                .reduce((total, candidate) => total + Math.max(toNumber(candidate.quantity, 0), 0), 0);
+            const key = this.batchUsageKey(row, batch);
+            let total = Math.max(toNumber(this.batchUsageTotals[key], 0), 0);
+
+            if (
+                excludedRowKey !== null
+                && String(row.key ?? '') === String(excludedRowKey)
+                && this.batchIdentity(row, this.selectedBatch(row)) === this.batchIdentity(row, batch)
+            ) {
+                total = Math.max(total - Math.max(toNumber(row.quantity, 0), 0), 0);
+            }
+
+            return roundCurrency(total);
         },
 
         batchRemainingQuantity(row, batch) {
@@ -1650,6 +1785,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         recalculateRow(row) {
+            this.rebuildBatchUsageTotals();
             this.syncBatchSelection(row);
             const availableQuantity = this.batchAvailableForRow(row);
             const rawQuantity = String(row.quantity ?? '').trim();
@@ -1657,6 +1793,7 @@ document.addEventListener('alpine:init', () => {
             if (rawQuantity === '') {
                 row.quantity = '';
                 row.line_total = 0;
+                this.rebuildBatchUsageTotals();
                 this.stockRevision += 1;
                 return;
             }
@@ -1674,6 +1811,7 @@ document.addEventListener('alpine:init', () => {
 
             row.quantity = safeQuantity > 0 ? String(roundCurrency(safeQuantity)) : '';
             row.line_total = roundCurrency(safeQuantity * Math.max(toNumber(row.unit_price, 0), 0));
+            this.rebuildBatchUsageTotals();
             this.stockRevision += 1;
         },
 
@@ -1686,6 +1824,7 @@ document.addEventListener('alpine:init', () => {
             }
 
             this.syncPaidAmount();
+            this.refreshVisibleRows();
         },
 
         rapikanRows() {
@@ -1719,6 +1858,7 @@ document.addEventListener('alpine:init', () => {
 
             if (this.payment_kind === 'credit') {
                 this.payment_method = 'credit';
+                this.syncDueDateFromSaleDate(true);
                 this.syncPaidAmount();
                 return;
             }
@@ -1819,7 +1959,12 @@ document.addEventListener('alpine:init', () => {
         },
 
         uniqueMedicineIds() {
-            return [...new Set(this.rows.map((row) => String(row.medicine_id ?? '')).filter((medicineId) => medicineId !== ''))];
+            return [...new Set(
+                this.rows
+                    .filter((row) => this.rowReadyForCompanion(row) || row.is_committed)
+                    .map((row) => String(row.medicine_id ?? ''))
+                    .filter((medicineId) => medicineId !== ''),
+            )];
         },
 
         rowsForMedicine(medicineId) {
@@ -1856,27 +2001,22 @@ document.addEventListener('alpine:init', () => {
                 return null;
             }
 
-            const lastUsedRow = [...medicineRows]
-                .reverse()
-                .find((row) => row.key !== excludedRowKey && this.rowIsUsed(row));
-            const lastUsedBatch = lastUsedRow ? this.selectedBatch(lastUsedRow) : null;
-
-            if (lastUsedBatch && this.batchRemainingQuantity(lastUsedRow, lastUsedBatch) > 0) {
-                return lastUsedBatch;
-            }
-
             const usedBatchIds = this.usedBatchIdsForMedicine(medicineId, excludedRowKey);
 
             return templateRow.batches.find((batch) =>
                 ! usedBatchIds.includes(String(batch.id ?? ''))
                 && this.batchRemainingQuantity(templateRow, batch) > 0
             )
-                ?? templateRow.batches.find((batch) => this.batchRemainingQuantity(templateRow, batch) > 0)
                 ?? null;
         },
 
         buildCompanionRow(row) {
             const preferredBatch = this.preferredBatchForMedicine(row.medicine_id);
+
+            if (! preferredBatch) {
+                return null;
+            }
+
             const markupPercentage = this.currentMarkup();
             const hydratedRow = this.hydrateRow({
                 key: `sale-item-${row.medicine_id}-dup-${this.nextDynamicRowId++}`,
@@ -1950,6 +2090,11 @@ document.addEventListener('alpine:init', () => {
 
             if (emptyRows.length === 0) {
                 const newRow = this.buildCompanionRow(medicineRows[medicineRows.length - 1]);
+
+                if (! newRow) {
+                    return;
+                }
+
                 const insertIndex = this.lastRowIndexForMedicine(medicineId);
 
                 this.rows.splice(insertIndex + 1, 0, newRow);
@@ -2002,6 +2147,8 @@ document.addEventListener('alpine:init', () => {
 
             this.uniqueMedicineIds().forEach((medicineId) => this.ensureCompanionRowsForMedicine(medicineId));
             this.sortRowsByFilled(true);
+            this.rebuildBatchUsageTotals();
+            this.refreshVisibleRows();
         },
 
         sanitizeMoneyValue(value) {
@@ -2538,9 +2685,12 @@ document.addEventListener('alpine:init', () => {
         selectedLocationId: String(config.initialLocationId ?? ''),
         defaultExpiryDate: String(config.defaultExpiryDate ?? ''),
         rows: [],
+        visibleRows: [],
+        renderedRows: [],
+        renderGeneration: 0,
         nextDynamicRowId: 1,
         searchTerm: '',
-        activeSubmitRowKey: '',
+        dirtyRowKeys: {},
 
         init() {
             const initialRows = Array.isArray(config.initialRows) ? config.initialRows : [];
@@ -2549,8 +2699,19 @@ document.addEventListener('alpine:init', () => {
                 ? initialRows.map((row) => this.hydrateRow(row))
                 : [];
 
+            this.dirtyRowKeys = Object.fromEntries(
+                this.rows
+                    .filter((row) => row.is_dirty)
+                    .map((row) => [String(row.key ?? ''), true]),
+            );
+
             this.nextDynamicRowId = this.rows.length + 1;
             this.syncSelectedLocation();
+            this.refreshVisibleRows();
+
+            this.$watch('searchTerm', () => {
+                this.refreshVisibleRows();
+            });
         },
 
         hydrateRow(row = {}) {
@@ -2571,6 +2732,7 @@ document.addEventListener('alpine:init', () => {
                 selling_price: row.selling_price ?? '',
                 notes: row.notes ?? '',
                 is_committed: row.is_committed === true,
+                is_dirty: row.is_dirty === true,
             };
         },
 
@@ -2591,6 +2753,7 @@ document.addEventListener('alpine:init', () => {
                 purchase_price: '',
                 selling_price: '',
                 notes: '',
+                is_dirty: false,
                 ...overrides,
             });
         },
@@ -2610,15 +2773,34 @@ document.addEventListener('alpine:init', () => {
                 row[field] = String(Math.floor(Math.max(toNumber(rawValue, 0), 0)));
             }
 
-            this.activeSubmitRowKey = row.key;
+            this.markRowForSubmit(index);
             this.handleRowInput(index);
+        },
+
+        setAllMedicineQuantities(quantity = 1000) {
+            const normalizedQuantity = String(Math.floor(Math.max(toNumber(quantity, 0), 0)));
+
+            this.rows.forEach((row, index) => {
+                const medicineId = String(row.medicine_id ?? '').trim();
+
+                if (medicineId === '') {
+                    return;
+                }
+
+                row.quantity = normalizedQuantity;
+                this.markRowForSubmit(index);
+                this.handleRowInput(index);
+            });
         },
 
         markRowForSubmit(index) {
             const row = this.rows[index];
 
             if (row) {
-                this.activeSubmitRowKey = row.key;
+                this.dirtyRowKeys = {
+                    ...this.dirtyRowKeys,
+                    [String(row.key ?? '')]: true,
+                };
             }
         },
 
@@ -2645,7 +2827,25 @@ document.addEventListener('alpine:init', () => {
         },
 
         rowShouldSubmit(row) {
-            return String(row.key ?? '') === String(this.activeSubmitRowKey ?? '');
+            return this.dirtyRowKeys[String(row.key ?? '')] === true;
+        },
+
+        submissionRows() {
+            return this.rows
+                .map((row, index) => ({ row, index }))
+                .filter(({ row }) => this.rowShouldSubmit(row));
+        },
+
+        submissionPayload() {
+            return JSON.stringify(this.submissionRows().map(({ row }) => ({
+                medicine_id: row.medicine_id,
+                storage_location_id: row.storage_location_id,
+                opening_item_id: row.opening_item_id,
+                batch_number: row.batch_number,
+                expiry_date: row.expiry_date,
+                quantity: row.quantity,
+                notes: row.notes,
+            })));
         },
 
         rowReadyForCompanion(row) {
@@ -2661,10 +2861,10 @@ document.addEventListener('alpine:init', () => {
             return this.rows.filter((row) => String(row.medicine_id ?? '') === String(medicineId ?? ''));
         },
 
-        filteredRows() {
+        refreshVisibleRows() {
             const query = String(this.searchTerm ?? '').trim().toLocaleLowerCase('id-ID');
 
-            const matchedRows = this.rows
+            this.visibleRows = this.rows
                 .map((row, index) => ({ row, index }))
                 .filter(({ row }) => {
                     if (query === '') {
@@ -2677,7 +2877,29 @@ document.addEventListener('alpine:init', () => {
                     ].some((value) => String(value ?? '').toLocaleLowerCase('id-ID').includes(query));
                 });
 
-            return matchedRows;
+            this.renderRowsProgressively();
+        },
+
+        renderRowsProgressively() {
+            const generation = ++this.renderGeneration;
+            const rowsToRender = this.visibleRows;
+            const batchSize = 100;
+
+            this.renderedRows = rowsToRender.slice(0, batchSize);
+
+            const appendNextBatch = () => {
+                if (generation !== this.renderGeneration || this.renderedRows.length >= rowsToRender.length) {
+                    return;
+                }
+
+                const nextRows = rowsToRender.slice(this.renderedRows.length, this.renderedRows.length + batchSize);
+                this.renderedRows.push(...nextRows);
+                window.requestAnimationFrame(appendNextBatch);
+            };
+
+            if (this.renderedRows.length < rowsToRender.length) {
+                window.requestAnimationFrame(appendNextBatch);
+            }
         },
 
         lastRowIndexForMedicine(medicineId) {
@@ -2723,6 +2945,7 @@ document.addEventListener('alpine:init', () => {
             medicineIds.forEach((medicineId) => this.ensureCompanionRowsForMedicine(medicineId));
 
             this.normalizeRowOrder();
+            this.refreshVisibleRows();
         },
 
         normalizeRowOrder() {

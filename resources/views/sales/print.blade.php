@@ -246,7 +246,10 @@
             <td width="40%">
                 <p class="document-title">Faktur Penjualan</p>
                 <p class="document-number">{{ $sale->sale_number }}</p>
-                <p class="document-date">{{ $sale->sale_date?->translatedFormat('d/m/Y') ?? '-' }}</p>
+                <p class="document-date">Tanggal Penjualan: {{ $sale->sale_date?->translatedFormat('d/m/Y') ?? '-' }}</p>
+                @if ($sale->payment_method === 'credit')
+                    <p class="document-date">Jatuh Tempo: {{ $dueDate?->translatedFormat('d/m/Y') ?? '-' }}</p>
+                @endif
             </td>
         </tr>
     </table>
@@ -257,10 +260,12 @@
         <tr>
             <td class="meta-label">Terima Dari</td>
             <td class="meta-separator">:</td>
-            <td class="meta-value">{{ $sale->customer_name ?: '-' }}</td>
-            <td class="meta-label">Jatuh Tempo</td>
-            <td class="meta-separator">:</td>
-            <td class="meta-value">-</td>
+            <td class="meta-value" @if ($sale->payment_method !== 'credit') colspan="4" @endif>{{ $sale->customer_name ?: '-' }}</td>
+            @if ($sale->payment_method === 'credit')
+                <td class="meta-label">Jatuh Tempo</td>
+                <td class="meta-separator">:</td>
+                <td class="meta-value">{{ $dueDate?->translatedFormat('d/m/Y') ?? '-' }}</td>
+            @endif
         </tr>
     </table>
 
@@ -335,7 +340,7 @@
                     </tr>
                     <tr>
                         <td class="summary-label">Tanggal Bayar</td>
-                        <td class="summary-value">-</td>
+                        <td class="summary-value">{{ $paymentDate?->translatedFormat('d/m/Y') ?? '-' }}</td>
                     </tr>
                     <tr>
                         <td class="summary-label">Status</td>

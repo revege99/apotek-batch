@@ -19,6 +19,7 @@ class Sale extends Model
     protected $fillable = [
         'sale_number',
         'sale_date',
+        'due_date',
         'status',
         'payment_method',
         'customer_id',
@@ -47,6 +48,7 @@ class Sale extends Model
     {
         return [
             'sale_date' => 'datetime',
+            'due_date' => 'date',
             'customer_group_markup_percentage' => 'decimal:2',
             'subtotal' => 'decimal:2',
             'discount_amount' => 'decimal:2',

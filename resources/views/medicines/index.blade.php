@@ -113,6 +113,7 @@
                             <th class="sticky z-10 bg-slate-50/95 px-4 py-2.5 shadow-[0_1px_0_rgba(226,232,240,0.9)] backdrop-blur" style="top: -20px;">Isi</th>
                             <th class="sticky z-10 bg-slate-50/95 px-4 py-2.5 shadow-[0_1px_0_rgba(226,232,240,0.9)] backdrop-blur" style="top: -20px;">Harga Beli</th>
                             <th class="sticky z-10 bg-slate-50/95 px-4 py-2.5 shadow-[0_1px_0_rgba(226,232,240,0.9)] backdrop-blur" style="top: -20px;">Min Stok</th>
+                            <th class="sticky z-10 bg-slate-50/95 px-4 py-2.5 text-center shadow-[0_1px_0_rgba(226,232,240,0.9)] backdrop-blur" style="top: -20px;">Status</th>
                             <th class="sticky z-10 bg-slate-50/95 px-4 py-2.5 text-center shadow-[0_1px_0_rgba(226,232,240,0.9)] backdrop-blur" style="top: -20px;">Aksi</th>
                         </tr>
                     </thead>
@@ -171,6 +172,17 @@
                                 </td>
                                 <td class="px-4 py-2.5 align-middle">
                                     <div class="flex min-h-8 items-center font-medium text-slate-900">{{ number_format((float) $medicine->minimum_stock, 0, ',', '.') }}</div>
+                                </td>
+                                <td class="px-4 py-2.5 text-center align-middle">
+                                    <span
+                                        @class([
+                                            'inline-flex min-w-[5.5rem] items-center justify-center rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold',
+                                            'border-emerald-200 bg-emerald-50 text-emerald-700' => $medicine->is_active,
+                                            'border-slate-200 bg-slate-100 text-slate-500' => ! $medicine->is_active,
+                                        ])
+                                    >
+                                        {{ $medicine->is_active ? 'Aktif' : 'Nonaktif' }}
+                                    </span>
                                 </td>
                                 <td class="px-4 py-2.5 text-center align-middle">
                                     <div
@@ -257,7 +269,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="px-5 py-14 text-center">
+                                <td colspan="9" class="px-5 py-14 text-center">
                                     <div class="mx-auto max-w-md space-y-3">
                                         <div class="empty-title">Belum ada data obat</div>
                                         <p class="content-copy">

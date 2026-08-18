@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use Carbon\Carbon;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -36,10 +37,21 @@ class SaleRequest extends FormRequest
             'payment_kind',
             ((string) $this->input('payment_method', 'cash')) === 'credit' ? 'credit' : 'cash'
         );
+        $dueDate = $this->input('due_date');
+
+        if ($paymentKind === 'credit' && ! filled($dueDate) && filled($this->input('sale_date'))) {
+            $dueDate = Carbon::parse((string) $this->input('sale_date'))->addDays(25)->toDateString();
+        }
+
+        if ($paymentKind !== 'credit') {
+            $dueDate = null;
+        }
 
         $this->merge([
             'items' => $items,
             'payment_kind' => $paymentKind,
+            'other_cost_amount' => $this->input('other_cost_amount', 0),
+            'due_date' => $dueDate,
         ]);
     }
 
@@ -55,6 +67,7 @@ class SaleRequest extends FormRequest
         return [
             'sale_number' => ['required', 'string', 'max:100', Rule::unique('sales', 'sale_number')->ignore($sale)],
             'sale_date' => ['required', 'date'],
+            'due_date' => ['nullable', 'required_if:payment_kind,credit', 'date'],
             'customer_id' => ['required', Rule::exists('customers', 'id')],
             'payment_kind' => ['required', Rule::in(['cash', 'social', 'credit'])],
             'payment_method' => ['required', Rule::in(['cash', 'transfer', 'qris', 'debit', 'credit'])],
@@ -82,6 +95,7 @@ class SaleRequest extends FormRequest
         return [
             'customer_id.required' => 'Pilih pelanggan terlebih dahulu.',
             'payment_kind.required' => 'Pilih jenis pembayaran terlebih dahulu.',
+            'due_date.required' => 'Tanggal jatuh tempo wajib diisi.',
             'items.required' => 'Tambahkan minimal satu item obat pada transaksi penjualan.',
             'items.min' => 'Tambahkan minimal satu item obat pada transaksi penjualan.',
             'items.*.stock_batch_id.required' => 'Pilih batch obat terlebih dahulu.',

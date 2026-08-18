@@ -70,6 +70,7 @@
 
             <form id="opening-stock-form" method="POST" action="{{ route('setup-saldo-awal.stok.store') }}" class="flex flex-col">
                 @csrf
+                <input type="hidden" name="items_payload" :value="submissionPayload()">
 
                 <div class="border-b border-slate-200/80 px-4 py-3">
                     <input type="hidden" id="notes" name="notes" value="{{ old('notes') }}">
@@ -77,7 +78,7 @@
                     <div class="flex flex-wrap items-center gap-2.5 xl:flex-nowrap">
                         <div class="min-w-0 flex-1">
                             <input
-                                x-model="searchTerm"
+                                x-model.debounce.150ms="searchTerm"
                                 type="text"
                                 placeholder="Cari nama obat atau kode obat"
                                 class="ui-control w-full px-3 text-[0.74rem]"
@@ -86,6 +87,14 @@
 
                         <div class="w-full sm:w-auto">
                             <div class="flex w-full flex-wrap gap-2 sm:w-auto">
+                                <button
+                                    type="button"
+                                    class="ui-action-btn ui-action-btn--neutral w-full px-3 text-[0.74rem] sm:w-auto"
+                                    @click="setAllMedicineQuantities(1000)"
+                                    title="Isi Qty Awal seluruh obat menjadi 1000"
+                                >
+                                    Set semua Qty 1000
+                                </button>
                                 <button
                                     type="button"
                                     class="ui-action-btn ui-action-btn--neutral w-full px-3 text-[0.74rem] sm:w-auto"
@@ -137,17 +146,17 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-200/80 bg-white">
-                            <template x-for="item in filteredRows()" :key="item.row.key">
-                                <tr class="align-middle" :class="isCompanionPlaceholder(item.row) ? 'bg-emerald-50/35' : ''">
+                            <template x-for="item in renderedRows" :key="item.row.key">
+                                <tr
+                                    class="align-middle"
+                                    :class="isCompanionPlaceholder(item.row) ? 'bg-emerald-50/35' : ''"
+                                    style="content-visibility: auto; contain-intrinsic-size: 44px;"
+                                >
                                     <td class="px-1.5 py-1.5">
-                                        <input type="hidden" :name="rowShouldSubmit(item.row) ? `items[${item.index}][medicine_id]` : null" x-model="item.row.medicine_id">
-                                        <input type="hidden" :name="rowShouldSubmit(item.row) ? `items[${item.index}][storage_location_id]` : null" x-model="item.row.storage_location_id">
-                                        <input type="hidden" :name="rowShouldSubmit(item.row) ? `items[${item.index}][opening_item_id]` : null" x-model="item.row.opening_item_id">
                                         <div class="px-1 text-[0.72rem] font-semibold text-slate-900" x-text="item.row.medicine_name || '-'"></div>
                                     </td>
                                     <td class="px-1 py-1.5 text-center">
                                         <input
-                                            :name="rowShouldSubmit(item.row) ? `items[${item.index}][batch_number]` : null"
                                             x-model="item.row.batch_number"
                                             @input="markRowForSubmit(item.index)"
                                             type="text"
@@ -158,7 +167,6 @@
                                     </td>
                                     <td class="px-1 py-1.5 text-center">
                                         <input
-                                            :name="rowShouldSubmit(item.row) ? `items[${item.index}][expiry_date]` : null"
                                             x-model="item.row.expiry_date"
                                             @change="markRowForSubmit(item.index)"
                                             type="date"
@@ -168,7 +176,6 @@
                                     </td>
                                     <td class="px-1 py-1.5 text-center">
                                         <input
-                                            :name="rowShouldSubmit(item.row) ? `items[${item.index}][quantity]` : null"
                                             x-model="item.row.quantity"
                                             @input="handleNumericInput(item.index, 'quantity')"
                                             type="number"
@@ -190,7 +197,7 @@
                                     </td>
                                 </tr>
                             </template>
-                            <tr x-show="filteredRows().length === 0">
+                            <tr x-show="visibleRows.length === 0">
                                 <td colspan="5" class="px-4 py-14 text-center">
                                     <div class="mx-auto max-w-md space-y-3">
                                         <div class="empty-title">Obat tidak ditemukan</div>

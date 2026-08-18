@@ -229,11 +229,13 @@ Route::middleware(['auth', 'verified', 'menu.access'])->group(function () use ($
     Route::post('/keuangan/riwayat-tagihan-internal/dokumen/{stockOpname}/bayar', [InternalBillingController::class, 'storeDocumentPayment'])->name('keuangan.riwayat-tagihan-internal.bayar-dokumen');
     Route::post('/keuangan/riwayat-tagihan-internal/{stockAdjustmentRecovery}/bayar', [InternalBillingController::class, 'storePayment'])->name('keuangan.riwayat-tagihan-internal.bayar');
     Route::delete('/keuangan/riwayat-tagihan-internal/pembayaran/{stockAdjustmentRecoveryPayment}', [InternalBillingController::class, 'destroyPayment'])->name('keuangan.riwayat-tagihan-internal.destroy-payment');
-    Route::get('/setup-saldo-awal/stok', [ProductionOpeningSetupController::class, 'stockIndex'])->name('setup-saldo-awal.stok');
-    Route::post('/setup-saldo-awal/stok', [ProductionOpeningSetupController::class, 'storeOpeningStock'])->name('setup-saldo-awal.stok.store');
-    Route::get('/setup-saldo-awal/piutang', [ProductionOpeningSetupController::class, 'receivableIndex'])->name('setup-saldo-awal.piutang');
-    Route::get('/setup-saldo-awal/hutang', [ProductionOpeningSetupController::class, 'payableIndex'])->name('setup-saldo-awal.hutang');
-    Route::get('/setup-saldo-awal/kas', [ProductionOpeningSetupController::class, 'cashIndex'])->name('setup-saldo-awal.kas');
+    Route::middleware('role:superadmin')->group(function () {
+        Route::get('/setup-saldo-awal/stok', [ProductionOpeningSetupController::class, 'stockIndex'])->name('setup-saldo-awal.stok');
+        Route::post('/setup-saldo-awal/stok', [ProductionOpeningSetupController::class, 'storeOpeningStock'])->name('setup-saldo-awal.stok.store');
+        Route::get('/setup-saldo-awal/piutang', [ProductionOpeningSetupController::class, 'receivableIndex'])->name('setup-saldo-awal.piutang');
+        Route::get('/setup-saldo-awal/hutang', [ProductionOpeningSetupController::class, 'payableIndex'])->name('setup-saldo-awal.hutang');
+        Route::get('/setup-saldo-awal/kas', [ProductionOpeningSetupController::class, 'cashIndex'])->name('setup-saldo-awal.kas');
+    });
     Route::get('/laporan/laporan-pembelian', [ReportController::class, 'purchase'])->name('laporan.laporan-pembelian');
     Route::get('/laporan/laporan-penjualan', [ReportController::class, 'sale'])->name('laporan.laporan-penjualan');
     Route::get('/laporan/laporan-penerimaan-kas', [ReportController::class, 'cashReceipt'])->name('laporan.laporan-penerimaan-kas');

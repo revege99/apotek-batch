@@ -42,7 +42,7 @@ class ProductionOpeningSetupController extends Controller
             'initialLocationId' => (string) old('storage_location_id', $openingLocationId ?? ''),
             'defaultEntryNumber' => $openingEntry?->entry_number ?: $this->nextEntryNumber(),
             'defaultOpeningDate' => $openingEntry?->opening_date?->toDateString() ?: now()->toDateString(),
-            'initialRows' => $this->initialOpeningRows($request),
+            'initialRows' => $this->initialOpeningRows($request, $openingLocationId),
         ]);
     }
 
@@ -102,6 +102,11 @@ class ProductionOpeningSetupController extends Controller
      */
     public function storeOpeningStock(Request $request): RedirectResponse
     {
+        if ($request->filled('items_payload')) {
+            $decodedItems = json_decode((string) $request->input('items_payload'), true);
+            $request->merge(['items' => is_array($decodedItems) ? $decodedItems : 'invalid']);
+        }
+
         $validator = Validator::make($request->all(), [
             'entry_number' => ['required', 'string', 'max:50'],
             'opening_date' => ['required', 'date'],
@@ -312,12 +317,8 @@ class ProductionOpeningSetupController extends Controller
      *
      * @return array<int, array<string, mixed>>
      */
-    private function initialOpeningRows(Request $request): array
+    private function initialOpeningRows(Request $request, ?int $savedLocationId = null): array
     {
-        $savedLocationId = OpeningStockEntryItem::query()
-            ->whereNotNull('storage_location_id')
-            ->oldest('id')
-            ->value('storage_location_id');
         $selectedLocationId = (string) old('storage_location_id', $savedLocationId ?? '');
         $medicineCollection = Medicine::query()
             ->orderBy('name')
@@ -350,6 +351,7 @@ class ProductionOpeningSetupController extends Controller
                     'purchase_price' => (string) ($row['purchase_price'] ?? ($medicine?->purchase_price ?? '')),
                     'selling_price' => (string) ($row['selling_price'] ?? ''),
                     'notes' => (string) ($row['notes'] ?? ''),
+                    'is_dirty' => true,
                 ];
             })->values();
 
@@ -394,6 +396,10 @@ class ProductionOpeningSetupController extends Controller
     private function savedOpeningRows(string $selectedLocationId): Collection
     {
         return OpeningStockEntryItem::query()
+            // Snapshot rows whose master medicine was removed are historical data,
+            // not inactive medicines, so they must not appear in the setup catalog.
+            ->whereNotNull('medicine_id')
+            ->whereHas('medicine')
             ->with([
                 'medicine:id,code,name,small_unit,is_active',
             ])
@@ -417,6 +423,7 @@ class ProductionOpeningSetupController extends Controller
                     'selling_price' => (string) $item->selling_price,
                     'notes' => (string) ($item->notes ?? ''),
                     'is_committed' => true,
+                    'is_dirty' => false,
                 ];
             });
     }
@@ -672,6 +679,7 @@ class ProductionOpeningSetupController extends Controller
             'purchase_price' => $medicine ? (string) ($medicine->purchase_price ?? '') : '',
             'selling_price' => '',
             'notes' => '',
+            'is_dirty' => false,
         ];
     }
 

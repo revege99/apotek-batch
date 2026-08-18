@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -31,7 +30,9 @@ return new class extends Migration
             $table->unsignedBigInteger('stock_adjustment_follow_up_id')->nullable()->after('stock_movement_id');
         });
 
-        DB::statement('ALTER TABLE stock_adjustment_recoveries MODIFY stock_movement_id BIGINT UNSIGNED NULL');
+        Schema::table('stock_adjustment_recoveries', function (Blueprint $table) {
+            $table->unsignedBigInteger('stock_movement_id')->nullable()->change();
+        });
 
         Schema::table('stock_adjustment_recoveries', function (Blueprint $table) {
             $table->foreign('stock_adjustment_follow_up_id', 'sar_followup_fk')
@@ -51,7 +52,9 @@ return new class extends Migration
             $table->dropColumn('stock_adjustment_follow_up_id');
         });
 
-        DB::statement('ALTER TABLE stock_adjustment_recoveries MODIFY stock_movement_id BIGINT UNSIGNED NOT NULL');
+        Schema::table('stock_adjustment_recoveries', function (Blueprint $table) {
+            $table->unsignedBigInteger('stock_movement_id')->nullable(false)->change();
+        });
 
         Schema::table('stock_adjustment_follow_ups', function (Blueprint $table) {
             $table->dropForeign('safu_replacement_location_fk');

@@ -129,6 +129,8 @@ class SaleController extends Controller
         $sales->getCollection()->transform(function (Sale $sale): Sale {
             $sale->payment_status_label = $this->paymentStatusLabel($sale);
             $sale->payment_status_tone = $this->paymentStatusTone($sale);
+            $sale->payment_method_label = $this->paymentMethodLabel($sale->payment_method);
+            $sale->payment_method_tone = $this->paymentMethodTone($sale->payment_method);
 
             return $sale;
         });
@@ -156,11 +158,15 @@ class SaleController extends Controller
         $sale->load([
             'customer:id,name,address',
             'customerGroup:id,name,markup_percentage',
+            'customerPayments:id,sale_id,payment_date',
             'items' => fn ($query) => $query
                 ->with(['medicine:id,code,name,small_unit'])
                 ->orderBy('id'),
         ]);
         $groupedItems = $this->groupedSaleDisplayItems($sale->items);
+        $dueDate = $sale->payment_method === 'credit'
+            ? ($sale->due_date ?? $sale->sale_date?->copy()->addDays(25))
+            : null;
 
         $profile = PharmacyProfile::query()->active()->latest('id')->first()
             ?? PharmacyProfile::query()->latest('id')->first()
@@ -176,6 +182,8 @@ class SaleController extends Controller
             'profile' => $profile,
             'paymentStatus' => $this->paymentStatusLabel($sale),
             'paymentMethodLabel' => $this->paymentMethodLabel($sale->payment_method),
+            'paymentDate' => $this->paymentDate($sale),
+            'dueDate' => $dueDate,
             'printedAt' => now(),
             'customerAddress' => $sale->customer?->address ?: '-',
             'grandTotalWords' => $this->rupiahInWords((float) $sale->grand_total),
@@ -244,6 +252,7 @@ class SaleController extends Controller
                 $sale = Sale::query()->create([
                     'sale_number' => $validated['sale_number'],
                     'sale_date' => $saleDate,
+                    'due_date' => $validated['due_date'] ?? null,
                     'status' => 'posted',
                     'payment_method' => $salePaymentMethod,
                     'customer_id' => $customer->id,
@@ -403,6 +412,7 @@ class SaleController extends Controller
                 $lockedSale->update([
                     'sale_number' => $validated['sale_number'],
                     'sale_date' => $saleDate,
+                    'due_date' => $validated['due_date'] ?? null,
                     'payment_method' => $salePaymentMethod,
                     'customer_id' => $customer->id,
                     'customer_group_id' => $customer->customer_group_id,
@@ -510,14 +520,16 @@ class SaleController extends Controller
                 $lockedSale->delete();
             });
         } catch (RuntimeException $exception) {
-            return back()
+            return redirect()
+                ->route('penjualan.data-penjualan')
                 ->with('toast', [
                     'type' => 'error',
                     'message' => $exception->getMessage(),
                 ]);
         }
 
-        return back()
+        return redirect()
+            ->route('penjualan.data-penjualan')
             ->with('toast', [
                 'type' => 'success',
                 'message' => 'Transaksi penjualan '.$saleNumber.' berhasil dihapus dan stok dikembalikan.',
@@ -529,9 +541,9 @@ class SaleController extends Controller
      *
      * @return array<int, array<string, mixed>>
      */
-    private function initialItems(Request $request): array
+    private function initialItems(Request $request, bool $ignoreOldInput = false): array
     {
-        $oldItems = collect($request->session()->getOldInput('items', []))
+        $oldItems = collect($ignoreOldInput ? [] : $request->session()->getOldInput('items', []))
             ->filter(fn ($item): bool => is_array($item) && isset($item['medicine_id']))
             ->values();
 
@@ -552,11 +564,21 @@ class SaleController extends Controller
             ->groupBy('medicine_id');
 
         $medicineRows = Medicine::query()
+            ->select([
+                'id',
+                'code',
+                'name',
+                'composition',
+                'small_unit',
+                'purchase_price',
+                'principal_id',
+                'is_active',
+            ])
             ->with('principal:id,name')
+            ->whereIn('id', $batchMap->keys())
             ->where('is_active', true)
             ->orderBy('name')
             ->get()
-            ->filter(fn (Medicine $medicine): bool => ($batchMap[$medicine->id] ?? collect())->isNotEmpty())
             ->values()
             ->map(function (Medicine $medicine, int $groupOrder) use ($batchMap): array {
                 /** @var Collection<int, StockBatch> $stockBatches */
@@ -643,6 +665,8 @@ class SaleController extends Controller
         return [
             'sale_number' => (string) $request->session()->getOldInput('sale_number', $this->nextSaleNumber()),
             'sale_date' => (string) $request->session()->getOldInput('sale_date', now()->format('Y-m-d\TH:i')),
+            'due_date' => (string) $request->session()->getOldInput('due_date', now()->addDays(25)->toDateString()),
+            'due_date_is_manual' => $request->session()->hasOldInput('due_date'),
             'customer_id' => (string) $request->session()->getOldInput('customer_id', ''),
             'payment_kind' => (string) $request->session()->getOldInput(
                 'payment_kind',
@@ -668,19 +692,62 @@ class SaleController extends Controller
             ->values();
 
         $baseRows = $this->editRowsFromSale($sale);
-        $rowsByKey = $baseRows->keyBy(fn (array $row): string => (string) $row['key']);
+        $usedBatchIdsByMedicine = $baseRows
+            ->groupBy(fn (array $row): string => (string) $row['medicine_id'])
+            ->map(fn (Collection $rows): array => $rows
+                ->pluck('stock_batch_id')
+                ->map(fn ($batchId): string => (string) $batchId)
+                ->all());
+        $catalogRows = collect($this->initialItems($request, true))
+            ->values()
+            ->map(function (array $row, int $index) use ($baseRows, $usedBatchIdsByMedicine): ?array {
+                $usedBatchIds = $usedBatchIdsByMedicine->get((string) $row['medicine_id'], []);
+                $availableBatches = collect($row['batches'])
+                    ->reject(fn (array $batch): bool => in_array((string) ($batch['id'] ?? ''), $usedBatchIds, true))
+                    ->values();
+
+                if ($usedBatchIds !== [] && $availableBatches->isEmpty()) {
+                    return null;
+                }
+
+                $defaultBatch = $availableBatches->first();
+
+                return [
+                    ...$row,
+                    'key' => 'sale-edit-catalog-'.$row['medicine_id'],
+                    'group_order' => $baseRows->count() + $index,
+                    'stock_batch_id' => (string) ($defaultBatch['id'] ?? ''),
+                    'stock_quantity' => (string) ($defaultBatch['stock_quantity'] ?? 0),
+                    'batches' => $availableBatches->all(),
+                ];
+            })
+            ->filter()
+            ->values();
+        $allRows = $baseRows->concat($catalogRows)->values();
 
         $items = $oldItems->isNotEmpty()
-            ? $oldItems->map(function (array $item, int $index) use ($rowsByKey): ?array {
-                $rowKey = 'sale-edit-row-'.$index;
-                $baseRow = $rowsByKey->get($rowKey);
+            ? $oldItems->map(function (array $item, int $index) use ($allRows): ?array {
+                $medicineId = (int) ($item['medicine_id'] ?? 0);
+                $selectedBatchId = $item['stock_batch_id'] ?? null;
+                $baseRow = $allRows->first(function (array $row) use ($medicineId, $selectedBatchId): bool {
+                    return (int) $row['medicine_id'] === $medicineId
+                        && $this->resolveSaleBatchOption(collect($row['batches']), $selectedBatchId) !== null;
+                }) ?? $allRows->firstWhere('medicine_id', $medicineId);
 
                 if ($baseRow === null) {
                     return null;
                 }
 
+                $selectedBatch = $this->resolveSaleBatchOption(
+                    collect($baseRow['batches']),
+                    $selectedBatchId,
+                ) ?? collect($baseRow['batches'])->first();
+
                 return [
                     ...$baseRow,
+                    'key' => 'sale-edit-old-'.$medicineId.'-'.$index,
+                    'stock_batch_id' => (string) ($selectedBatch['id'] ?? $baseRow['stock_batch_id']),
+                    'stock_quantity' => (string) ($selectedBatch['stock_quantity'] ?? $baseRow['stock_quantity']),
                     'quantity' => (string) ($item['quantity'] ?? $baseRow['quantity']),
                     'markup_percentage' => array_key_exists('markup_percentage', $item)
                         ? (string) $item['markup_percentage']
@@ -691,11 +758,16 @@ class SaleController extends Controller
                     'manual_unit_price' => (string) ($item['manual_unit_price'] ?? '0'),
                 ];
             })->filter()->values()->all()
-            : $baseRows->values()->all();
+            : $allRows->all();
 
         return [
             'sale_number' => (string) $request->session()->getOldInput('sale_number', $sale->sale_number),
             'sale_date' => (string) $request->session()->getOldInput('sale_date', $sale->sale_date?->format('Y-m-d\TH:i')),
+            'due_date' => (string) $request->session()->getOldInput(
+                'due_date',
+                $sale->due_date?->toDateString() ?: $sale->sale_date?->copy()->addDays(25)->toDateString()
+            ),
+            'due_date_is_manual' => $request->session()->hasOldInput('due_date') || $sale->due_date !== null,
             'customer_id' => (string) $request->session()->getOldInput('customer_id', (string) $sale->customer_id),
             'payment_kind' => (string) $request->session()->getOldInput(
                 'payment_kind',
@@ -828,10 +900,11 @@ class SaleController extends Controller
             ->flatten(1)
             ->mapWithKeys(fn (StockBatch $batch): array => [$batch->id => round((float) $batch->quantity_balance, 2)]);
         $requestedQuantities = [];
+        $selectedBatchGroups = [];
 
         return collect($items)
             ->values()
-            ->flatMap(function (array $item) use ($medicines, $stockBatches, $batchGroupByBatchId, &$remainingQuantities, &$requestedQuantities, $defaultMarkupPercentage): array {
+            ->flatMap(function (array $item) use ($medicines, $stockBatches, $batchGroupByBatchId, &$remainingQuantities, &$requestedQuantities, &$selectedBatchGroups, $defaultMarkupPercentage): array {
                 /** @var Medicine|null $medicine */
                 $medicine = $medicines->get((int) $item['medicine_id']);
 
@@ -857,6 +930,19 @@ class SaleController extends Controller
                 }
 
                 $batchGroupKey = $this->saleBatchGroupKey($selectedBatchGroup->first());
+                $selectionKey = $medicine->id.'|'.$batchGroupKey;
+
+                if (isset($selectedBatchGroups[$selectionKey])) {
+                    $batchNumber = trim((string) ($selectedBatchGroup->first()?->batch_number ?? ''));
+
+                    throw new RuntimeException(
+                        'Obat '.$medicine->name.' dengan batch '
+                        .($batchNumber !== '' ? $batchNumber : 'tanpa batch')
+                        .' hanya boleh dimasukkan satu kali. Gunakan satu baris atau pilih batch yang berbeda.'
+                    );
+                }
+
+                $selectedBatchGroups[$selectionKey] = true;
                 $batchTotalStock = round((float) $selectedBatchGroup->sum('quantity_balance'), 2);
                 $requestedBatchQuantity = round(
                     (float) ($requestedQuantities[$batchGroupKey] ?? 0) + $quantity,
@@ -1019,6 +1105,7 @@ class SaleController extends Controller
                         'sale_number' => $sale->sale_number,
                         'sale_date' => $sale->sale_date?->translatedFormat('d M Y H:i') ?? '-',
                         'customer' => $sale->customer_name ?: '-',
+                        'payment_method' => $this->paymentMethodLabel($sale->payment_method),
                         'payment_status' => $this->paymentStatusLabel($sale),
                         'group_name' => $sale->customerGroup?->name ?: '-',
                         'item_count' => number_format($groupedItems->count()),
@@ -1103,13 +1190,9 @@ class SaleController extends Controller
      */
     private function paymentStatusLabel(Sale $sale): string
     {
-        if ((float) $sale->social_amount > 0.001) {
-            return 'Sosial';
-        }
-
         return $sale->payment_method === 'credit' && $this->outstandingAmount($sale) > 0.001
-            ? 'Kredit'
-            : 'Lunas';
+            ? 'BELUM LUNAS'
+            : 'LUNAS';
     }
 
     /**
@@ -1117,10 +1200,6 @@ class SaleController extends Controller
      */
     private function paymentStatusTone(Sale $sale): string
     {
-        if ((float) $sale->social_amount > 0.001) {
-            return 'border-sky-200 bg-sky-50 text-sky-700';
-        }
-
         return $sale->payment_method === 'credit' && $this->outstandingAmount($sale) > 0.001
             ? 'border-amber-200 bg-amber-50 text-amber-700'
             : 'border-emerald-200 bg-emerald-50 text-emerald-700';
@@ -1136,8 +1215,37 @@ class SaleController extends Controller
             'transfer' => 'TRANSFER',
             'qris' => 'QRIS',
             'debit' => 'DEBIT',
-            default => 'CASH',
+            default => 'TUNAI',
         };
+    }
+
+    /**
+     * Resolve the display badge tone for the original payment method.
+     */
+    private function paymentMethodTone(string $paymentMethod): string
+    {
+        return match ($paymentMethod) {
+            'credit' => 'border-violet-200 bg-violet-50 text-violet-700',
+            'transfer' => 'border-blue-200 bg-blue-50 text-blue-700',
+            'qris' => 'border-cyan-200 bg-cyan-50 text-cyan-700',
+            'debit' => 'border-indigo-200 bg-indigo-50 text-indigo-700',
+            default => 'border-slate-200 bg-slate-100 text-slate-700',
+        };
+    }
+
+    /**
+     * Resolve the actual payment date shown on the sale invoice.
+     */
+    private function paymentDate(Sale $sale): ?Carbon
+    {
+        if ($sale->payment_method !== 'credit') {
+            return $sale->sale_date;
+        }
+
+        return $sale->customerPayments
+            ->sortByDesc(fn ($payment) => $payment->payment_date?->getTimestamp() ?? 0)
+            ->first()
+            ?->payment_date;
     }
 
     /**
