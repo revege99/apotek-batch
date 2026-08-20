@@ -75,6 +75,7 @@
                                 value="{{ $search }}"
                                 placeholder="Cari obat"
                                 class="ui-control"
+                                x-init="$nextTick(() => { $el.focus(); $el.setSelectionRange($el.value.length, $el.value.length) })"
                                 @input.debounce.350ms="$el.form?.requestSubmit()"
                             >
                         </div>
