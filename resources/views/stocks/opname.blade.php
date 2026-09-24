@@ -1,9 +1,12 @@
 <x-app-layout>
     @php
         $currentLocationId = $locationId ?? null;
+        $editingOpname = $editingOpname ?? null;
         $worksheetRows = $rows->values()->map(function (array $row, int $index): array {
             $row['original_index'] = $index;
-            $row['physical_quantity'] = old('items.'.$index.'.physical_quantity');
+            $row['physical_quantity'] = session()->hasOldInput('items')
+                ? old('items.'.$index.'.physical_quantity')
+                : ($row['physical_quantity'] ?? null);
 
             return $row;
         });
@@ -61,6 +64,16 @@
             },
             submitOpnameForm() {
                 this.saveConfirmOpen = false;
+                this.$refs.itemsPayload.value = JSON.stringify(Object.fromEntries(
+                    this.rows.filter((row) => this.isCounted(row)).map((row) => [row.original_index, {
+                        medicine_id: row.medicine_id,
+                        stock_batch_id: row.stock_batch_id,
+                        storage_location_id: row.storage_location_id,
+                        system_quantity: row.system_quantity,
+                        average_unit_cost: row.purchase_price,
+                        physical_quantity: row.physical_quantity,
+                    }])
+                ));
 
                 if (typeof this.$refs.stockOpnameForm?.requestSubmit === 'function') {
                     this.$refs.stockOpnameForm.requestSubmit();
@@ -68,6 +81,29 @@
                 }
 
                 this.$refs.stockOpnameForm?.submit();
+            },
+            exportExcel() {
+                const headers = ['Kode', 'Obat', 'Ringkasan Batch', 'Lokasi', 'Stok Sistem', 'Stok Fisik', 'Lebih', 'Hilang', 'Nilai Selisih'];
+                const csvQuote = String.fromCharCode(34);
+                const escapeCsv = (value) => csvQuote + String(value ?? '').replaceAll(csvQuote, csvQuote + csvQuote) + csvQuote;
+                const rows = this.filteredRows().map((row) => [
+                    row.medicine_code,
+                    row.medicine_name,
+                    row.batch_summary,
+                    row.location_name,
+                    this.formatNumber(row.system_quantity),
+                    this.isCounted(row) ? this.formatNumber(row.physical_quantity) : '',
+                    this.formatNumber(this.more(row)),
+                    this.formatNumber(this.less(row)),
+                    this.formatCurrency(this.adjustment(row)),
+                ]);
+                const csv = [headers, ...rows].map((row) => row.map(escapeCsv).join(';')).join('\r\n');
+                const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `stok-opname-{{ now()->format('Ymd') }}.csv`;
+                link.click();
+                URL.revokeObjectURL(link.href);
             },
             formatNumber(value) {
                 const parsed = Number(value ?? 0);
@@ -181,62 +217,59 @@
         @keydown.escape.window="closeDeleteDialog(); closeSaveConfirm()"
         class="space-y-5"
     >
-        @if ($errors->has('items'))
+        @if ($errors->any())
             <section class="panel-surface px-4 py-3">
-                <p class="text-[0.78rem] font-medium text-rose-700">{{ $errors->first('items') }}</p>
+                @foreach ($errors->all() as $message)
+                    <p class="text-[0.78rem] font-medium text-rose-700">{{ $message }}</p>
+                @endforeach
             </section>
         @endif
 
         <section class="panel-surface overflow-visible p-0">
             <div class="border-b border-slate-200/80 px-4 py-3">
                 <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                    <div class="flex flex-wrap items-center gap-2 text-[0.72rem]">
-                        <div class="rounded-full bg-emerald-50 px-3 py-2 font-semibold text-emerald-700">
-                            Dicek <span x-text="formatNumber(countedRows())"></span>
+                    <form x-ref="filterForm" id="stock-opname-filter-form" method="GET" action="{{ route('stok-batch.stok-opname') }}" class="flex w-full min-w-0 flex-nowrap items-center gap-2 xl:w-auto">
+                        <div class="min-w-0 flex-1 xl:w-[17rem] xl:flex-none">
+                            <label for="search" class="sr-only">Cari obat</label>
+                            <input
+                                id="search"
+                                type="text"
+                                x-model="searchTerm"
+                                placeholder="Cari obat, batch, principal, lokasi"
+                                class="ui-control w-full px-3 text-[0.74rem]"
+                            >
                         </div>
-                        <div class="rounded-full bg-sky-50 px-3 py-2 font-semibold text-sky-700">
-                            Lebih <span x-text="formatNumber(totalMore())"></span>
-                        </div>
-                        <div class="rounded-full bg-rose-50 px-3 py-2 font-semibold text-rose-700">
-                            Hilang <span x-text="formatNumber(totalLess())"></span>
-                        </div>
-                    </div>
 
-                    <form x-ref="filterForm" id="stock-opname-filter-form" method="GET" action="{{ route('stok-batch.stok-opname') }}" class="flex flex-wrap items-center justify-end gap-2">
+                        @unless ($editingOpname)
+                        <div class="w-[10rem] shrink-0">
+                            <label for="location_id" class="sr-only">Lokasi</label>
+                            <select id="location_id" name="location_id" @change="submitFilter()" class="ui-select-control w-full px-3 text-[0.74rem]">
+                                @foreach ($locations as $location)
+                                    <option value="{{ $location->id }}" @selected($currentLocationId === $location->id)>{{ $location->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        @endunless
+                    </form>
+
+                    <div class="flex flex-wrap items-center justify-end gap-2">
                         <a
                             href="{{ route('stok-batch.stok-opname.draft') }}"
                             class="ui-action-btn ui-action-btn--soft px-3 text-[0.74rem]"
                         >
                             Draft terbaru
                         </a>
-
-                        <div class="w-[16rem]">
-                            <label for="notes" class="sr-only">Catatan</label>
-                            <input
-                                id="notes"
-                                name="notes"
-                                form="stock-opname-form"
-                                type="text"
-                                value="{{ old('notes') }}"
-                                placeholder="Catatan umum stok opname"
-                                class="ui-control px-3 text-[0.74rem]"
-                            >
-                        </div>
-
-                        <div class="w-[10rem]">
-                            <label for="location_id" class="sr-only">Lokasi</label>
-                            <select id="location_id" name="location_id" @change="submitFilter()" class="ui-select-control px-3 text-[0.74rem]">
-                                @foreach ($locations as $location)
-                                    <option value="{{ $location->id }}" @selected($currentLocationId === $location->id)>{{ $location->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                    </form>
+                        <button type="button" @click="exportExcel()" class="ui-action-btn ui-action-btn--neutral px-3 text-[0.74rem]">Export Excel</button>
+                    </div>
                 </div>
             </div>
 
-            <form x-ref="stockOpnameForm" id="stock-opname-form" method="POST" action="{{ route('stok-batch.stok-opname.store') }}" class="flex flex-col">
+            <form x-ref="stockOpnameForm" id="stock-opname-form" method="POST" action="{{ $editingOpname ? route('stok-batch.stok-opname.update', $editingOpname) : route('stok-batch.stok-opname.store') }}" class="flex flex-col">
                 @csrf
+                @if ($editingOpname)
+                    @method('PUT')
+                @endif
+                <input type="hidden" name="items_payload" x-ref="itemsPayload">
 
                 <div class="border-b border-slate-200/80 px-4 py-3">
                     <div class="flex flex-wrap items-center gap-2.5 xl:flex-nowrap">
@@ -262,34 +295,21 @@
                             >
                         </div>
 
-                        <div class="flex min-w-0 flex-1 items-center gap-2">
-                            <label for="search" class="shrink-0 text-[0.66rem] font-semibold uppercase tracking-[0.14em] text-slate-400">Cari obat</label>
-                            <div class="flex min-w-0 flex-1 items-center gap-1.5">
-                                <input
-                                    id="search"
-                                    type="text"
-                                    x-model="searchTerm"
-                                    placeholder="Cari obat, batch, principal, lokasi"
-                                    class="ui-control min-w-0 flex-1 px-3 text-[0.74rem]"
-                                >
-                                <button
-                                    type="button"
-                                    @click="rapikanRows()"
-                                    class="ui-action-btn ui-action-btn--neutral shrink-0 px-3"
-                                    title="Rapikan baris yang sudah diisi"
-                                    aria-label="Rapikan baris stok opname"
-                                >
-                                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M9 11l3 3L22 4" />
-                                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-                                    </svg>
-                                </button>
-                            </div>
+                        <div class="min-w-0 flex-1">
+                            <label for="notes" class="sr-only">Catatan</label>
+                            <input
+                                id="notes"
+                                name="notes"
+                                type="text"
+                                value="{{ old('notes', $editingOpname?->notes) }}"
+                                placeholder="Catatan umum stok opname"
+                                class="ui-control w-full px-3 text-[0.74rem]"
+                            >
                         </div>
 
                         <div class="w-full sm:w-auto">
                             <button type="button" @click="openSaveConfirm()" class="ui-action-btn ui-action-btn--soft w-full px-4 text-[0.74rem] sm:w-auto">
-                                Simpan Draft
+                                {{ $editingOpname ? 'Simpan Perubahan' : 'Simpan Draft' }}
                             </button>
                         </div>
                     </div>
@@ -350,16 +370,10 @@
                                         <div class="font-semibold text-slate-900" x-text="row.system_quantity_label"></div>
                                     </td>
                                     <td class="px-2.5 py-2">
-                                        <input type="hidden" :name="`items[${row.original_index}][stock_batch_id]`" :value="row.stock_batch_id">
-                                        <input type="hidden" :name="`items[${row.original_index}][medicine_id]`" :value="row.medicine_id">
-                                        <input type="hidden" :name="`items[${row.original_index}][storage_location_id]`" :value="row.storage_location_id">
-                                        <input type="hidden" :name="`items[${row.original_index}][system_quantity]`" :value="row.system_quantity">
-                                        <input type="hidden" :name="`items[${row.original_index}][average_unit_cost]`" :value="row.purchase_price">
                                         <input
                                             type="number"
                                             min="0"
                                             step="0.01"
-                                            :name="`items[${row.original_index}][physical_quantity]`"
                                             x-model="row.physical_quantity"
                                             data-opname-physical-input
                                             class="ui-control number-input-no-spinner mx-auto h-8 w-24 px-2 text-center text-[0.72rem]"
@@ -403,7 +417,7 @@
                     </div>
 
                     <div class="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[0.78rem] text-slate-700">
-                        Draft akan menyimpan hasil cek sementara sesuai lokasi yang sedang dipilih.
+                        {{ $editingOpname ? 'Perubahan akan disimpan ke draft '.$editingOpname->opname_number.'.' : 'Draft akan menyimpan hasil cek sementara sesuai lokasi yang sedang dipilih.' }}
                     </div>
 
                     <div class="mt-5 flex justify-end gap-2">
@@ -411,7 +425,7 @@
                             Cek lagi
                         </button>
                         <button x-ref="confirmSaveButton" type="button" class="ui-action-btn border border-emerald-300 bg-emerald-500 px-4 text-white hover:bg-emerald-600" @click="submitOpnameForm()">
-                            Ya, simpan draft
+                            {{ $editingOpname ? 'Ya, simpan perubahan' : 'Ya, simpan draft' }}
                         </button>
                     </div>
                 </div>

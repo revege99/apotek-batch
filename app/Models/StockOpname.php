@@ -22,7 +22,6 @@ class StockOpname extends Model
         'status',
         'notes',
         'created_by',
-        'approved_by',
     ];
 
     /**
@@ -53,11 +52,4 @@ class StockOpname extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    /**
-     * Get the approver of the opname document.
-     */
-    public function approver(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'approved_by');
-    }
 }

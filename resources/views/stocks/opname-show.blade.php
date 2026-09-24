@@ -13,15 +13,14 @@
                 <div class="space-y-2">
                     <div class="flex flex-wrap items-center gap-2">
                         <h2 class="page-title text-[1.05rem]">Hasil Stok Opname {{ $stockOpname->opname_number }}</h2>
-                        <span class="inline-flex rounded-full border px-2.5 py-1 text-[0.64rem] font-semibold uppercase tracking-[0.14em] {{ $stockOpname->status === 'approved' ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : 'border-amber-100 bg-amber-50 text-amber-700' }}">
-                            {{ $stockOpname->status }}
+                        <span class="inline-flex rounded-full border px-2.5 py-1 text-[0.64rem] font-semibold uppercase tracking-[0.14em] border-emerald-100 bg-emerald-50 text-emerald-700">
+                            Tersimpan
                         </span>
                     </div>
 
                     <div class="flex flex-wrap gap-x-5 gap-y-1 text-[0.74rem] text-slate-600">
                         <span>Tanggal {{ $stockOpname->opname_date?->translatedFormat('d M Y') ?? '-' }}</span>
                         <span>Dibuat oleh {{ $stockOpname->creator?->name ?? '-' }}</span>
-                        <span>Approved oleh {{ $stockOpname->approver?->name ?? '-' }}</span>
                     </div>
 
                     @if (filled($stockOpname->notes))
@@ -30,7 +29,7 @@
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
-                    @if ($stockOpname->status === 'approved' && $rows->count() > 0)
+                    @if ($rows->count() > 0)
                         <a href="{{ route('stok-batch.penyesuaian-stok.dokumen', $stockOpname->id) }}" class="ui-action-btn ui-action-btn--soft px-3 text-[0.74rem]">
                             Dokumen tindak lanjut
                         </a>

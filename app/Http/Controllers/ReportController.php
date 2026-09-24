@@ -8,7 +8,6 @@ use App\Models\PurchaseInvoice;
 use App\Models\PurchaseReturn;
 use App\Models\Sale;
 use App\Models\SaleReturn;
-use App\Models\StockAdjustmentRecovery;
 use App\Models\StockAdjustmentRecoveryPayment;
 use App\Models\StockBatch;
 use App\Models\StockMovement;
@@ -193,8 +192,27 @@ class ReportController extends Controller
     {
         [$dateFrom, $dateTo] = $this->resolveMonthRange($request);
         $search = trim((string) $request->query('search', ''));
-        $query = $this->writeoffLossBaseQuery($search, $dateFrom, $dateTo);
-        $rows = $query->paginate(20)->withQueryString();
+        $rows = $this->paginateCollection(
+            $this->writeoffLossBaseQuery($search, $dateFrom, $dateTo)
+                ->addSelect('stock_opnames.id as stock_opname_id')
+                ->get()
+                ->groupBy('stock_opname_id')
+                ->map(function ($movements): object {
+                    $first = $movements->first();
+
+                    return (object) [
+                        'stock_opname_id' => $first->stock_opname_id,
+                        'movement_date' => $movements->max('movement_date'),
+                        'opname_number' => $first->opname_number,
+                        'item_count' => $movements->pluck('medicine_id')->filter()->unique()->count(),
+                        'total_quantity' => (float) $movements->sum('quantity_out'),
+                        'total_value' => (float) $movements->sum(fn ($row) => (float) $row->quantity_out * (float) $row->unit_cost),
+                        'processed_by_name' => $movements->pluck('processed_by_name')->filter()->unique()->implode(', ') ?: '-',
+                    ];
+                })
+                ->sortByDesc(fn (object $row) => $row->movement_date?->getTimestamp() ?? 0),
+            $request,
+        );
 
         $statsRow = $this->writeoffLossStatsQuery($search, $dateFrom, $dateTo)
             ->selectRaw('
@@ -946,6 +964,7 @@ class ReportController extends Controller
             ->select([
                 'stock_movements.id',
                 'stock_movements.movement_date',
+                'stock_movements.medicine_id',
                 'stock_movements.quantity_out',
                 'stock_movements.unit_cost',
                 'stock_movements.notes',

@@ -43,7 +43,6 @@
                             <th class="px-3 py-3">No opname</th>
                             <th class="px-2.5 py-3">Tanggal</th>
                             <th class="px-2.5 py-3">Dibuat</th>
-                            <th class="px-2.5 py-3">Approved</th>
                             <th class="px-2.5 py-3 text-center">Item Selisih</th>
                             <th class="px-2.5 py-3 text-center">Hilang</th>
                             <th class="px-2.5 py-3 text-center">Lebih</th>
@@ -70,7 +69,6 @@
                                 <td class="px-3 py-3 font-semibold text-slate-900">{{ $row->opname_number }}</td>
                                 <td class="px-2.5 py-3 text-slate-700">{{ $row->opname_date?->translatedFormat('d M Y') ?? '-' }}</td>
                                 <td class="px-2.5 py-3 text-slate-700">{{ $row->creator_name }}</td>
-                                <td class="px-2.5 py-3 text-slate-700">{{ $row->approver_name }}</td>
                                 <td class="px-2.5 py-3 text-center font-semibold text-slate-900">{{ number_format($row->item_count) }}</td>
                                 <td class="px-2.5 py-3 text-center font-semibold text-rose-700">{{ number_format($row->loss_count) }}</td>
                                 <td class="px-2.5 py-3 text-center font-semibold text-sky-700">{{ number_format($row->gain_count) }}</td>
@@ -160,11 +158,11 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="10" class="px-5 py-14 text-center">
+                                <td colspan="9" class="px-5 py-14 text-center">
                                     <div class="mx-auto max-w-md space-y-3">
                                         <div class="empty-title">Belum ada dokumen selisih stok opname</div>
                                         <p class="content-copy">
-                                            Hasil stok opname approved yang punya selisih akan muncul di sini sebagai satu dokumen tindak lanjut.
+                                            Hasil stok opname tersimpan yang punya selisih akan muncul di sini sebagai satu dokumen tindak lanjut.
                                         </p>
                                     </div>
                                 </td>

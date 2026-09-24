@@ -321,6 +321,7 @@ class ProductionOpeningSetupController extends Controller
     {
         $selectedLocationId = (string) old('storage_location_id', $savedLocationId ?? '');
         $medicineCollection = Medicine::query()
+            ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'code', 'name', 'small_unit', 'purchase_price', 'is_active']);
         $medicines = $medicineCollection->keyBy('id');
@@ -371,6 +372,7 @@ class ProductionOpeningSetupController extends Controller
             return $savedRows
                 ->concat($hydratedRows)
                 ->concat($remainingRows)
+                ->sortBy(fn (array $row): string => mb_strtolower((string) ($row['medicine_name'] ?? '')))
                 ->values()
                 ->all();
         }
@@ -387,7 +389,11 @@ class ProductionOpeningSetupController extends Controller
             ->map(fn (Medicine $medicine, int $index): array => $this->blankOpeningRow('opening-row-'.$index, $medicine, $selectedLocationId))
             ->all();
 
-        return $savedRows->concat($blankRows)->values()->all();
+        return $savedRows
+            ->concat($blankRows)
+            ->sortBy(fn (array $row): string => mb_strtolower((string) ($row['medicine_name'] ?? '')))
+            ->values()
+            ->all();
     }
 
     /**

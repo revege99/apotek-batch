@@ -2,24 +2,25 @@
 
 namespace App\Http\Controllers;
 
-use Carbon\Carbon;
 use App\Models\Medicine;
-use App\Models\StockAdjustmentFollowUp;
-use App\Models\StockAdjustmentFollowUpBatch;
-use App\Models\StockBatch;
-use App\Models\StockAdjustmentRecovery;
-use App\Models\StockMovement;
-use App\Models\StockOpname;
-use App\Models\StockOpnameItem;
 use App\Models\PurchaseExchangeItem;
 use App\Models\PurchaseExchangeReplacementItem;
 use App\Models\PurchaseReturnItem;
 use App\Models\PurchaseReturnReplacementItem;
 use App\Models\SaleItem;
 use App\Models\SaleReturnItem;
+use App\Models\StockAdjustmentFollowUp;
+use App\Models\StockAdjustmentFollowUpBatch;
+use App\Models\StockAdjustmentRecovery;
+use App\Models\StockBatch;
+use App\Models\StockMovement;
+use App\Models\StockOpname;
+use App\Models\StockOpnameItem;
 use App\Models\StorageLocation;
+use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -27,6 +28,8 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 class StockController extends Controller
@@ -96,7 +99,7 @@ class StockController extends Controller
     }
 
     /**
-     * Display stock adjustments generated from stock opname approvals.
+     * Display stock adjustments from saved stock opname documents.
      */
     public function adjustmentIndex(Request $request): View
     {
@@ -109,7 +112,6 @@ class StockController extends Controller
         $rows = StockOpname::query()
             ->with([
                 'creator:id,name',
-                'approver:id,name',
                 'items' => function ($query) {
                     $query
                         ->whereRaw('ABS(difference_quantity) > 0.0001')
@@ -120,7 +122,6 @@ class StockController extends Controller
                         ->orderBy('id');
                 },
             ])
-            ->where('status', 'approved')
             ->whereHas('items', function (Builder $builder) use ($adjustmentType, $search): void {
                 $builder
                     ->whereRaw('ABS(difference_quantity) > 0.0001')
@@ -144,8 +145,7 @@ class StockController extends Controller
                 $query->where(function (Builder $innerQuery) use ($search): void {
                     $innerQuery
                         ->where('opname_number', 'like', "%{$search}%")
-                        ->orWhereHas('creator', fn (Builder $creatorQuery) => $creatorQuery->where('name', 'like', "%{$search}%"))
-                        ->orWhereHas('approver', fn (Builder $approverQuery) => $approverQuery->where('name', 'like', "%{$search}%"));
+                        ->orWhereHas('creator', fn (Builder $creatorQuery) => $creatorQuery->where('name', 'like', "%{$search}%"));
                 });
             })
             ->when($dateFrom !== '', fn (Builder $query) => $query->whereDate('opname_date', '>=', $dateFrom))
@@ -181,7 +181,6 @@ class StockController extends Controller
                     'opname_number' => $opname->opname_number,
                     'opname_date' => $opname->opname_date,
                     'creator_name' => $opname->creator?->name ?: '-',
-                    'approver_name' => $opname->approver?->name ?: '-',
                     'item_count' => $items->count(),
                     'loss_count' => $lossCount,
                     'gain_count' => $gainCount,
@@ -197,7 +196,6 @@ class StockController extends Controller
             ->whereRaw('ABS(difference_quantity) > 0.0001')
             ->whereHas('stockOpname', function (Builder $builder) use ($dateFrom, $dateTo): void {
                 $builder
-                    ->where('status', 'approved')
                     ->when($dateFrom !== '', fn (Builder $query) => $query->whereDate('opname_date', '>=', $dateFrom))
                     ->when($dateTo !== '', fn (Builder $query) => $query->whereDate('opname_date', '<=', $dateTo));
             });
@@ -227,7 +225,6 @@ class StockController extends Controller
     {
         $stockOpname->load([
             'creator:id,name',
-            'approver:id,name',
             'items' => function ($query) {
                 $query
                     ->whereRaw('ABS(difference_quantity) > 0.0001')
@@ -239,8 +236,6 @@ class StockController extends Controller
             },
         ]);
 
-        abort_unless($stockOpname->status === 'approved', 404);
-
         $rows = $stockOpname->items
             ->sortBy(fn (StockOpnameItem $item) => [
                 (string) ($item->medicine?->name ?? ''),
@@ -251,6 +246,7 @@ class StockController extends Controller
         return view('stocks.adjustment-document', [
             ...$this->pageData('stok-batch.penyesuaian-stok'),
             'stockOpname' => $stockOpname,
+            'forms' => $rows->map(fn (StockOpnameItem $item): array => $this->adjustmentFormData($item)),
             'rows' => $rows,
             'summary' => [
                 'item_count' => $rows->count(),
@@ -264,88 +260,7 @@ class StockController extends Controller
         ]);
     }
 
-    /**
-     * Process all drafted follow-ups within one stock opname document.
-     */
-    public function adjustmentDocumentProcess(StockOpname $stockOpname): RedirectResponse
-    {
-        $stockOpname->load([
-            'items' => function ($query) {
-                $query
-                    ->whereRaw('ABS(difference_quantity) > 0.0001')
-                    ->with([
-                        'stockOpname:id,opname_number,opname_date,status',
-                        'medicine:id,code,name,purchase_price',
-                        'followUp.batchSelections.stockBatch',
-                        'followUp.recovery',
-                    ])
-                    ->orderBy('id');
-            },
-        ]);
-
-        abort_unless($stockOpname->status === 'approved', 404);
-
-        /** @var Collection<int, StockOpnameItem> $rows */
-        $rows = $stockOpname->items->values();
-
-        if ($rows->isEmpty()) {
-            return redirect()
-                ->route('stok-batch.penyesuaian-stok.dokumen', $stockOpname->id)
-                ->with('toast', [
-                    'type' => 'error',
-                    'message' => 'Dokumen ini tidak memiliki item selisih untuk diproses.',
-                ]);
-        }
-
-        $pendingItems = $rows->filter(fn (StockOpnameItem $item): bool => $item->followUp === null);
-
-        if ($pendingItems->isNotEmpty()) {
-            return redirect()
-                ->route('stok-batch.penyesuaian-stok.dokumen', $stockOpname->id)
-                ->with('toast', [
-                    'type' => 'error',
-                    'message' => 'Masih ada item selisih yang belum diatur. Lengkapi semua draft item terlebih dahulu sebelum memproses dokumen.',
-                ]);
-        }
-
-        $draftItems = $rows->filter(fn (StockOpnameItem $item): bool => $item->followUp?->status === 'draft')->values();
-
-        if ($draftItems->isEmpty()) {
-            return redirect()
-                ->route('stok-batch.penyesuaian-stok.dokumen', $stockOpname->id)
-                ->with('toast', [
-                    'type' => 'error',
-                    'message' => 'Tidak ada draft tindak lanjut yang perlu diproses pada dokumen ini.',
-                ]);
-        }
-
-        try {
-            DB::transaction(function () use ($draftItems): void {
-                foreach ($draftItems as $item) {
-                    $this->processAdjustmentFollowUpOrFail($item);
-                }
-            });
-        } catch (RuntimeException $exception) {
-            return redirect()
-                ->route('stok-batch.penyesuaian-stok.dokumen', $stockOpname->id)
-                ->with('toast', [
-                    'type' => 'error',
-                    'message' => $exception->getMessage(),
-                ]);
-        }
-
-        return redirect()
-            ->route('stok-batch.penyesuaian-stok.dokumen', $stockOpname->id)
-            ->with('toast', [
-                'type' => 'success',
-                'message' => 'Seluruh draft tindak lanjut pada dokumen ini berhasil diproses.',
-            ]);
-    }
-
-    /**
-     * Show a follow-up form for one opname-difference item.
-     */
-    public function adjustmentFollowUpCreate(StockOpnameItem $stockOpnameItem): View
+    private function adjustmentFormData(StockOpnameItem $stockOpnameItem): array
     {
         $stockOpnameItem->load([
             'medicine:id,code,name,small_unit',
@@ -355,27 +270,24 @@ class StockController extends Controller
             'followUp.recovery',
         ]);
 
-        abort_unless($stockOpnameItem->stockOpname?->status === 'approved', 404);
+        abort_unless($stockOpnameItem->stockOpname, 404);
         abort_if(abs((float) $stockOpnameItem->difference_quantity) < 0.0001, 404);
-
-        $showAllBatches = request()->boolean('show_all_batches');
 
         $baseBatchQuery = StockBatch::query()
             ->with('storageLocation:id,name')
             ->where('medicine_id', $stockOpnameItem->medicine_id)
+            ->where('status', 'active')
+            ->where('quantity_balance', '>', 0)
+            ->when($stockOpnameItem->storage_location_id, fn (Builder $query) => $query->where('storage_location_id', $stockOpnameItem->storage_location_id))
             ->orderBy('expiry_date')
             ->orderByDesc('quantity_balance')
             ->orderByDesc('received_at')
             ->orderBy('batch_number');
 
-        $batchRows = $showAllBatches
-            ? (clone $baseBatchQuery)->get()
-            : (clone $baseBatchQuery)->where('quantity_balance', '>', 0)->get();
-
-        if ($batchRows->isEmpty()) {
-            $batchRows = (clone $baseBatchQuery)->get();
-            $showAllBatches = true;
-        }
+        $replacementBatchIds = StockMovement::query()
+            ->where('reference_table', 'stock_opname_items')->where('reference_id', $stockOpnameItem->id)
+            ->where('notes', 'like', 'Pengganti batch baru %')->pluck('stock_batch_id');
+        $batchRows = $baseBatchQuery->whereNotIn('id', $replacementBatchIds)->get();
 
         $activeLocations = StorageLocation::query()
             ->active()
@@ -386,42 +298,79 @@ class StockController extends Controller
             ?->keyBy(fn (StockAdjustmentFollowUpBatch $selection) => (string) ($selection->stockBatch?->batch_number ?: $selection->stock_batch_id))
             ?? collect();
 
-        return view('stocks.adjustment-follow-up', [
+        return [
             ...$this->pageData('stok-batch.penyesuaian-stok'),
             'item' => $stockOpnameItem,
             'batches' => $this->groupFollowUpBatchRows($batchRows),
-            'showAllBatches' => $showAllBatches,
             'selectionMap' => $selectionMap,
             'activeLocations' => $activeLocations,
-            'defaultAdjustmentNumber' => $stockOpnameItem->followUp?->adjustment_number ?? $this->generateAdjustmentFollowUpNumber(),
+            'defaultAdjustmentNumber' => $stockOpnameItem->followUp?->adjustment_number ?? 'ADJ-'.now()->format('Ymd').'-'.$stockOpnameItem->id,
             'defaultAdjustmentDate' => $stockOpnameItem->followUp?->adjustment_date?->toDateString() ?? now()->toDateString(),
-        ]);
+        ];
+    }
+
+    public function applyOpnameStock(StockOpname $stockOpname): RedirectResponse
+    {
+        return $this->changeOpnameStock($stockOpname, false);
+    }
+
+    public function restoreOpnameStock(StockOpname $stockOpname): RedirectResponse
+    {
+        return $this->changeOpnameStock($stockOpname, true);
+    }
+
+    private function changeOpnameStock(StockOpname $stockOpname, bool $restore): RedirectResponse
+    {
+        try {
+            DB::transaction(function () use ($stockOpname, $restore): void {
+                StockOpname::query()->lockForUpdate()->findOrFail($stockOpname->id);
+                $items = $stockOpname->items()->whereRaw('ABS(difference_quantity) > 0.0001')
+                    ->with('stockOpname', 'followUp.batchSelections.stockBatch', 'followUp.recovery')
+                    ->orderByDesc('id')->lockForUpdate()->get();
+                // Reverse in movement order so multiple adjustments to one batch can be restored.
+                if ($restore) {
+                    $items = $items->sortByDesc(fn ($item) => StockMovement::query()
+                        ->where('reference_table', 'stock_opname_items')->where('reference_id', $item->id)->max('id') ?? 0);
+                }
+                foreach ($items as $item) {
+                    if ($restore) {
+                        $this->rollbackAdjustmentOrFail($item);
+
+                        continue;
+                    }
+                    if ($item->followUp?->status === 'applied') {
+                        continue;
+                    }
+                    if (! $item->followUp || abs((float) $item->followUp->batchSelections->sum('quantity') - (float) $item->physical_quantity) > 0.001) {
+                        throw new RuntimeException('Lengkapi stok fisik seluruh batch sesuai hasil opname sebelum menerapkan stok.');
+                    }
+                    $this->processAdjustmentFollowUpOrFail($item);
+                }
+            });
+        } catch (RuntimeException $exception) {
+            return back()->with('toast', ['type' => 'error', 'message' => $exception->getMessage()]);
+        }
+
+        return back()->with('toast', ['type' => 'success', 'message' => $restore
+            ? 'Stok dikembalikan ke sebelum penyesuaian. Input batch tetap tersimpan.'
+            : 'Stok obat berhasil diperbarui sesuai opname.']);
     }
 
     /**
-     * Store a draft follow-up adjustment selection per batch.
+     * Save and immediately apply a batch adjustment, rolling back the previous adjustment when editing.
      */
-    public function adjustmentFollowUpStore(Request $request, StockOpnameItem $stockOpnameItem): RedirectResponse
+    public function adjustmentFollowUpStore(Request $request, StockOpnameItem $stockOpnameItem): RedirectResponse|JsonResponse
     {
         $stockOpnameItem->loadMissing([
             'stockOpname:id,opname_number,opname_date,status',
             'followUp.batchSelections',
         ]);
 
-        abort_unless($stockOpnameItem->stockOpname?->status === 'approved', 404);
+        abort_unless($stockOpnameItem->stockOpname, 404);
         abort_if(abs((float) $stockOpnameItem->difference_quantity) < 0.0001, 404);
 
-        if ($stockOpnameItem->followUp?->status === 'applied') {
-            return redirect()
-                ->route('stok-batch.penyesuaian-stok.follow-up', $stockOpnameItem->id)
-                ->with('toast', [
-                    'type' => 'error',
-                    'message' => 'Tindak lanjut ini sudah diproses dan tidak bisa diubah lagi.',
-                ]);
-        }
-
         $validator = Validator::make($request->all(), [
-            'adjustment_number' => ['required', 'string', 'max:50'],
+            'adjustment_number' => ['required', 'string', 'max:50', Rule::unique('stock_adjustment_follow_ups', 'adjustment_number')->ignore($stockOpnameItem->followUp?->id)],
             'adjustment_date' => ['required', 'date'],
             'settlement_type' => ['required', 'string', 'max:30'],
             'employee_name' => ['nullable', 'string', 'max:255'],
@@ -431,11 +380,15 @@ class StockController extends Controller
             'replacement_storage_location_id' => ['nullable', 'integer', 'exists:storage_locations,id'],
             'notes' => ['nullable', 'string', 'max:1000'],
             'batches' => ['required', 'array'],
-            'batches.*.batch_number' => ['nullable', 'string', 'max:100'],
+            'batches.*.batch_number' => ['required', 'string', 'max:100', 'distinct'],
             'batches.*.quantity' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         if ($validator->fails()) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $validator->errors()->first()], 422);
+            }
+
             return back()
                 ->withInput()
                 ->withErrors($validator)
@@ -500,7 +453,11 @@ class StockController extends Controller
 
         $selectedBatches = collect($validated['batches'])
             ->map(function (array $batch): ?array {
-                $quantity = round((float) ($batch['quantity'] ?? 0), 2);
+                if (($batch['quantity'] ?? null) === null || $batch['quantity'] === '') {
+                    return null;
+                }
+
+                $quantity = round((float) $batch['quantity'], 2);
                 $batchNumber = trim((string) ($batch['batch_number'] ?? ''));
 
                 if ($quantity < 0 || $batchNumber === '') {
@@ -516,131 +473,97 @@ class StockController extends Controller
             ->values();
 
         $selectedQuantity = round((float) $selectedBatches->sum('quantity'), 2);
+        $isComplete = abs($selectedQuantity - $physicalQuantity) <= 0.001;
 
-        if ($selectedBatches->isEmpty() && $physicalQuantity > 0.001) {
-            return back()
-                ->withInput()
-                ->withErrors([
-                    'batches' => 'Pilih minimal satu batch untuk tindak lanjut selisih stok.',
-                ])
-                ->with('toast', [
-                    'type' => 'error',
-                    'message' => 'Pilih minimal satu batch untuk tindak lanjut selisih stok.',
-                ]);
+        try {
+            DB::transaction(function () use ($validated, $stockOpnameItem, $differenceType, $selectedBatches, $settlementType): void {
+                StockOpname::query()->lockForUpdate()->findOrFail($stockOpnameItem->stock_opname_id);
+                $stockOpnameItem = StockOpnameItem::query()->lockForUpdate()->findOrFail($stockOpnameItem->id);
+                if ($stockOpnameItem->followUp?->status === 'applied' || $stockOpnameItem->followUp()->where('status', 'applied')->exists()) {
+                    throw new RuntimeException('Kembalikan stok dokumen terlebih dahulu sebelum mengubah input penyesuaian.');
+                }
+                $batchRows = StockBatch::query()
+                    ->where('medicine_id', $stockOpnameItem->medicine_id)
+                    ->when($stockOpnameItem->storage_location_id, fn (Builder $query) => $query->where('storage_location_id', $stockOpnameItem->storage_location_id))
+                    ->whereIn('batch_number', $selectedBatches->pluck('batch_number')->all())
+                    ->orderBy('expiry_date')
+                    ->orderBy('id')
+                    ->get()
+                    ->groupBy(fn (StockBatch $batch): string => (string) $batch->batch_number);
+
+                if ($selectedBatches->pluck('batch_number')->diff($batchRows->keys())->isNotEmpty()) {
+                    throw new RuntimeException('Batch penyesuaian tidak ditemukan untuk obat dan lokasi opname ini.');
+                }
+                /** @var StockAdjustmentFollowUp $followUp */
+                $followUp = StockAdjustmentFollowUp::query()->updateOrCreate(
+                    ['stock_opname_item_id' => $stockOpnameItem->id],
+                    [
+                        'adjustment_number' => trim((string) $validated['adjustment_number']),
+                        'adjustment_date' => $validated['adjustment_date'],
+                        'difference_type' => $differenceType,
+                        'settlement_type' => $settlementType,
+                        'status' => 'draft',
+                        'employee_name' => filled($validated['employee_name'] ?? null) ? trim((string) $validated['employee_name']) : null,
+                        'replacement_batch_number' => filled($validated['replacement_batch_number'] ?? null) ? trim((string) $validated['replacement_batch_number']) : null,
+                        'replacement_expiry_date' => $validated['replacement_expiry_date'] ?? null,
+                        'replacement_purchase_price' => filled($validated['replacement_purchase_price'] ?? null) ? round((float) $validated['replacement_purchase_price'], 2) : null,
+                        'replacement_storage_location_id' => filled($validated['replacement_storage_location_id'] ?? null) ? (int) $validated['replacement_storage_location_id'] : null,
+                        'notes' => filled($validated['notes'] ?? null) ? trim((string) $validated['notes']) : null,
+                        'processed_at' => null,
+                        'processed_by' => null,
+                        'created_by' => auth()->id(),
+                    ]
+                );
+
+                $followUp->batchSelections()->delete();
+
+                $followUp->batchSelections()->createMany(
+                    $selectedBatches
+                        ->map(function (array $batch) use ($differenceType, $batchRows): array {
+                            /** @var Collection<int, StockBatch> $groupedBatches */
+                            $groupedBatches = $batchRows->get($batch['batch_number'], collect());
+                            /** @var StockBatch|null $stockBatch */
+                            $stockBatch = $groupedBatches->first();
+                            $totalBalance = round((float) $groupedBatches->sum(fn (StockBatch $row) => (float) $row->quantity_balance), 2);
+                            $weightedCost = $totalBalance > 0
+                                ? round(
+                                    (float) $groupedBatches->sum(
+                                        fn (StockBatch $row): float => (float) $row->quantity_balance * (float) $row->purchase_price
+                                    ) / $totalBalance,
+                                    2
+                                )
+                                : round((float) ($stockBatch?->purchase_price ?? 0), 2);
+
+                            return [
+                                'stock_batch_id' => $stockBatch?->id,
+                                'action_type' => $differenceType === 'loss' ? 'deduct' : 'add',
+                                'quantity' => $batch['quantity'],
+                                'unit_cost' => $weightedCost,
+                                'notes' => 'Batch '.$batch['batch_number'],
+                            ];
+                        })->all()
+                );
+            });
+        } catch (RuntimeException $exception) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $exception->getMessage()], 422);
+            }
+
+            return back()->withInput()->with('toast', ['type' => 'error', 'message' => $exception->getMessage()]);
         }
 
-        if (abs($selectedQuantity - $physicalQuantity) > 0.001) {
-            return back()
-                ->withInput()
-                ->withErrors([
-                    'batches' => 'Total stok fisik per batch harus sama dengan stok fisik hasil opname.',
-                ])
-                ->with('toast', [
-                    'type' => 'error',
-                    'message' => 'Total stok fisik per batch harus sama dengan stok fisik hasil opname.',
-                ]);
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Stok fisik berhasil disimpan.',
+                'applied' => false,
+            ]);
         }
-
-        $batchRows = StockBatch::query()
-            ->where('medicine_id', $stockOpnameItem->medicine_id)
-            ->whereIn('batch_number', $selectedBatches->pluck('batch_number')->all())
-            ->orderBy('expiry_date')
-            ->orderBy('id')
-            ->get()
-            ->groupBy(fn (StockBatch $batch): string => (string) $batch->batch_number);
-
-        DB::transaction(function () use ($validated, $stockOpnameItem, $differenceType, $selectedBatches, $batchRows, $settlementType): void {
-            /** @var StockAdjustmentFollowUp $followUp */
-            $followUp = StockAdjustmentFollowUp::query()->updateOrCreate(
-                ['stock_opname_item_id' => $stockOpnameItem->id],
-                [
-                    'adjustment_number' => trim((string) $validated['adjustment_number']),
-                    'adjustment_date' => $validated['adjustment_date'],
-                    'difference_type' => $differenceType,
-                    'settlement_type' => $settlementType,
-                    'status' => 'draft',
-                    'employee_name' => filled($validated['employee_name'] ?? null) ? trim((string) $validated['employee_name']) : null,
-                    'replacement_batch_number' => filled($validated['replacement_batch_number'] ?? null) ? trim((string) $validated['replacement_batch_number']) : null,
-                    'replacement_expiry_date' => $validated['replacement_expiry_date'] ?? null,
-                    'replacement_purchase_price' => filled($validated['replacement_purchase_price'] ?? null) ? round((float) $validated['replacement_purchase_price'], 2) : null,
-                    'replacement_storage_location_id' => filled($validated['replacement_storage_location_id'] ?? null) ? (int) $validated['replacement_storage_location_id'] : null,
-                    'notes' => filled($validated['notes'] ?? null) ? trim((string) $validated['notes']) : null,
-                    'processed_at' => null,
-                    'processed_by' => null,
-                    'created_by' => auth()->id(),
-                ]
-            );
-
-            $followUp->batchSelections()->delete();
-
-            $followUp->batchSelections()->createMany(
-                $selectedBatches
-                    ->map(function (array $batch) use ($differenceType, $batchRows): array {
-                        /** @var Collection<int, StockBatch> $groupedBatches */
-                        $groupedBatches = $batchRows->get($batch['batch_number'], collect());
-                        /** @var StockBatch|null $stockBatch */
-                        $stockBatch = $groupedBatches->first();
-                        $totalBalance = round((float) $groupedBatches->sum(fn (StockBatch $row) => (float) $row->quantity_balance), 2);
-                        $weightedCost = $totalBalance > 0
-                            ? round(
-                                (float) $groupedBatches->sum(
-                                    fn (StockBatch $row): float => (float) $row->quantity_balance * (float) $row->purchase_price
-                                ) / $totalBalance,
-                                2
-                            )
-                            : round((float) ($stockBatch?->purchase_price ?? 0), 2);
-
-                        return [
-                            'stock_batch_id' => $stockBatch?->id,
-                            'action_type' => $differenceType === 'loss' ? 'deduct' : 'add',
-                            'quantity' => $batch['quantity'],
-                            'unit_cost' => $weightedCost,
-                            'notes' => 'Batch '.$batch['batch_number'],
-                        ];
-                    })->all()
-            );
-        });
 
         return redirect()
             ->route('stok-batch.penyesuaian-stok.dokumen', $stockOpnameItem->stock_opname_id)
             ->with('toast', [
                 'type' => 'success',
-                'message' => 'Tindak lanjut penyesuaian stok berhasil disimpan. Stok belum berubah sebelum diproses.',
-            ]);
-    }
-
-    /**
-     * Process a saved follow-up so stock and internal recovery records are updated.
-     */
-    public function adjustmentFollowUpProcess(StockOpnameItem $stockOpnameItem): RedirectResponse
-    {
-        $stockOpnameItem->load([
-            'stockOpname:id,opname_number,opname_date,status',
-            'medicine:id,code,name,purchase_price',
-            'followUp.batchSelections.stockBatch',
-            'followUp.recovery',
-        ]);
-
-        abort_unless($stockOpnameItem->stockOpname?->status === 'approved', 404);
-
-        try {
-            DB::transaction(function () use ($stockOpnameItem): void {
-                $this->processAdjustmentFollowUpOrFail($stockOpnameItem);
-            });
-        } catch (RuntimeException $exception) {
-            return redirect()
-                ->route('stok-batch.penyesuaian-stok.follow-up', $stockOpnameItem->id)
-                ->with('toast', [
-                    'type' => 'error',
-                    'message' => $exception->getMessage(),
-                ]);
-        }
-
-        return redirect()
-            ->route('stok-batch.penyesuaian-stok.follow-up', $stockOpnameItem->id)
-            ->with('toast', [
-                'type' => 'success',
-                'message' => 'Tindak lanjut stok opname berhasil diproses.',
+                'message' => 'Input penyesuaian tersimpan. Gunakan Terapkan ke stok untuk memperbarui stok obat.',
             ]);
     }
 
@@ -673,6 +596,7 @@ class StockController extends Controller
 
         $groupedBatches = StockBatch::query()
             ->where('medicine_id', $stockOpnameItem->medicine_id)
+            ->when($stockOpnameItem->storage_location_id, fn (Builder $query) => $query->where('storage_location_id', $stockOpnameItem->storage_location_id))
             ->whereIn('batch_number', $followUp->batchSelections
                 ->map(fn (StockAdjustmentFollowUpBatch $selection): string => trim((string) Str::after((string) $selection->notes, 'Batch ')))
                 ->filter()
@@ -762,129 +686,90 @@ class StockController extends Controller
         ]);
     }
 
-    /**
-     * Cancel an already processed follow-up and restore stock balances.
-     */
-    public function adjustmentFollowUpCancel(Request $request, StockOpnameItem $stockOpnameItem): RedirectResponse
+    private function rollbackAdjustmentOrFail(StockOpnameItem $stockOpnameItem): void
     {
-        $stockOpnameItem->load([
-            'stockOpname:id,opname_number,opname_date,status',
-            'followUp.recovery',
+        $stockOpnameItem->load('followUp.recovery');
+        $followUp = $stockOpnameItem->followUp;
+        if (! $followUp || $followUp->status !== 'applied') {
+            return;
+        }
+        if ((float) ($followUp->recovery?->paid_amount ?? 0) > 0.001 || $followUp->recovery?->payments()->exists()) {
+            throw new RuntimeException('Penyesuaian tidak dapat diubah atau dihapus karena tagihan sudah memiliki pembayaran.');
+        }
+        $movements = StockMovement::query()
+            ->with('stockBatch')
+            ->where('reference_table', 'stock_opname_items')
+            ->where('reference_id', $stockOpnameItem->id)
+            ->where(function (Builder $query) use ($followUp) {
+                $query
+                    ->where('notes', 'like', 'Tindak lanjut '.$followUp->adjustment_number.'%')
+                    ->orWhere('notes', 'like', 'Pengganti batch baru '.$followUp->adjustment_number.'%');
+            })
+            ->orderByDesc('id')
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($movements as $movement) {
+            $hasLaterMovement = StockMovement::query()
+                ->where('stock_batch_id', $movement->stock_batch_id)
+                ->where('id', '>', $movement->id)
+                ->exists();
+
+            if ($hasLaterMovement) {
+                throw new RuntimeException('Pembatalan ditolak karena batch sudah memiliki mutasi stok setelah tindak lanjut ini diproses.');
+            }
+
+            $stockBatch = StockBatch::query()
+                ->lockForUpdate()
+                ->find($movement->stock_batch_id);
+
+            if ($stockBatch === null) {
+                throw new RuntimeException('Batch stok terkait tindak lanjut ini sudah tidak ditemukan.');
+            }
+
+            $quantityIn = round((float) $movement->quantity_in, 2);
+            $quantityOut = round((float) $movement->quantity_out, 2);
+            $newQuantityIn = round((float) $stockBatch->quantity_in - $quantityIn, 2);
+            $newQuantityOut = round((float) $stockBatch->quantity_out - $quantityOut, 2);
+            $newBalance = round((float) $stockBatch->quantity_balance - $quantityIn + $quantityOut, 2);
+
+            if ($newQuantityIn < -0.001 || $newQuantityOut < -0.001 || $newBalance < -0.001) {
+                throw new RuntimeException('Saldo batch sudah berubah sehingga pembatalan tidak bisa dilakukan dengan aman.');
+            }
+
+            $isReplacementBatchMovement = $quantityIn > 0
+                && str_starts_with((string) $movement->notes, 'Pengganti batch baru '.$followUp->adjustment_number)
+                && $stockBatch->purchase_invoice_item_id === null;
+
+            if ($isReplacementBatchMovement) {
+                $stockBatch->delete();
+                $movement->delete();
+
+                continue;
+            }
+
+            $stockBatch->update([
+                'quantity_in' => max($newQuantityIn, 0),
+                'quantity_out' => max($newQuantityOut, 0),
+                'quantity_balance' => max($newBalance, 0),
+                'status' => $newBalance > 0 ? 'active' : 'empty',
+                'notes' => $this->removeFollowUpNote(
+                    notes: (string) $stockBatch->notes,
+                    adjustmentNumber: $followUp->adjustment_number,
+                ),
+            ]);
+
+            $movement->delete();
+        }
+
+        $followUp->recovery()?->delete();
+
+        $followUp->update([
+            'status' => 'draft',
+            'processed_at' => null,
+            'processed_by' => null,
         ]);
 
-        abort_unless($stockOpnameItem->stockOpname?->status === 'approved', 404);
-
-        /** @var StockAdjustmentFollowUp|null $followUp */
-        $followUp = $stockOpnameItem->followUp;
-
-        if ($followUp === null || $followUp->status !== 'applied') {
-            return $this->followUpCancelRedirect($request, $stockOpnameItem)
-                ->with('toast', [
-                    'type' => 'error',
-                    'message' => 'Tindak lanjut ini belum diproses, jadi tidak ada yang perlu dibatalkan.',
-                ]);
-        }
-
-        if ((float) ($followUp->recovery?->paid_amount ?? 0) > 0.001) {
-            return $this->followUpCancelRedirect($request, $stockOpnameItem)
-                ->with('toast', [
-                    'type' => 'error',
-                    'message' => 'Proses tidak bisa dibatalkan karena tagihan ganti uang sudah memiliki pembayaran.',
-                ]);
-        }
-
-        try {
-            DB::transaction(function () use ($stockOpnameItem, $followUp): void {
-                $movements = StockMovement::query()
-                    ->with('stockBatch')
-                    ->where('reference_table', 'stock_opname_items')
-                    ->where('reference_id', $stockOpnameItem->id)
-                    ->where(function (Builder $query) use ($followUp) {
-                        $query
-                            ->where('notes', 'like', 'Tindak lanjut '.$followUp->adjustment_number.'%')
-                            ->orWhere('notes', 'like', 'Pengganti batch baru '.$followUp->adjustment_number.'%');
-                    })
-                    ->orderByDesc('id')
-                    ->lockForUpdate()
-                    ->get();
-
-                if ($movements->isEmpty()) {
-                    throw new RuntimeException('Riwayat proses tindak lanjut ini tidak ditemukan, jadi belum bisa dibatalkan.');
-                }
-
-                foreach ($movements as $movement) {
-                    $hasLaterMovement = StockMovement::query()
-                        ->where('stock_batch_id', $movement->stock_batch_id)
-                        ->where('id', '>', $movement->id)
-                        ->exists();
-
-                    if ($hasLaterMovement) {
-                        throw new RuntimeException('Pembatalan ditolak karena batch sudah memiliki mutasi stok setelah tindak lanjut ini diproses.');
-                    }
-
-                    $stockBatch = StockBatch::query()
-                        ->lockForUpdate()
-                        ->find($movement->stock_batch_id);
-
-                    if ($stockBatch === null) {
-                        throw new RuntimeException('Batch stok terkait tindak lanjut ini sudah tidak ditemukan.');
-                    }
-
-                    $quantityIn = round((float) $movement->quantity_in, 2);
-                    $quantityOut = round((float) $movement->quantity_out, 2);
-                    $newQuantityIn = round((float) $stockBatch->quantity_in - $quantityIn, 2);
-                    $newQuantityOut = round((float) $stockBatch->quantity_out - $quantityOut, 2);
-                    $newBalance = round((float) $stockBatch->quantity_balance - $quantityIn + $quantityOut, 2);
-
-                    if ($newQuantityIn < -0.001 || $newQuantityOut < -0.001 || $newBalance < -0.001) {
-                        throw new RuntimeException('Saldo batch sudah berubah sehingga pembatalan tidak bisa dilakukan dengan aman.');
-                    }
-
-                    $isReplacementBatchMovement = $quantityIn > 0
-                        && str_starts_with((string) $movement->notes, 'Pengganti batch baru '.$followUp->adjustment_number)
-                        && $stockBatch->purchase_invoice_item_id === null;
-
-                    if ($isReplacementBatchMovement) {
-                        $stockBatch->delete();
-                        $movement->delete();
-                        continue;
-                    }
-
-                    $stockBatch->update([
-                        'quantity_in' => max($newQuantityIn, 0),
-                        'quantity_out' => max($newQuantityOut, 0),
-                        'quantity_balance' => max($newBalance, 0),
-                        'status' => $newBalance > 0 ? 'active' : 'empty',
-                        'notes' => $this->removeFollowUpNote(
-                            notes: (string) $stockBatch->notes,
-                            adjustmentNumber: $followUp->adjustment_number,
-                        ),
-                    ]);
-
-                    $movement->delete();
-                }
-
-                $followUp->recovery()?->delete();
-
-                $followUp->update([
-                    'status' => 'draft',
-                    'processed_at' => null,
-                    'processed_by' => null,
-                ]);
-            });
-        } catch (RuntimeException $exception) {
-            return $this->followUpCancelRedirect($request, $stockOpnameItem)
-                ->with('toast', [
-                    'type' => 'error',
-                    'message' => $exception->getMessage(),
-                ]);
-        }
-
-        return $this->followUpCancelRedirect($request, $stockOpnameItem)
-            ->with('toast', [
-                'type' => 'success',
-                'message' => 'Proses tindak lanjut berhasil dibatalkan dan stok batch sudah dikembalikan.',
-            ]);
     }
 
     /**
@@ -961,6 +846,10 @@ class StockController extends Controller
         $search = trim((string) $request->string('search'));
         $locationId = (int) $request->integer('location_id');
         $locationId = $locationId > 0 ? $locationId : $this->defaultOpnameLocationId();
+        $todayOpname = StockOpname::query()
+            ->whereDate('opname_date', now()->toDateString())
+            ->latest('id')
+            ->first();
 
         $rows = $this->stockOpnameMedicineRows($search, $locationId);
 
@@ -975,7 +864,7 @@ class StockController extends Controller
             'locationId' => $locationId,
             'rows' => $rows,
             'locations' => $activeLocations,
-            'defaultOpnameNumber' => $this->generateOpnameNumber(),
+            'defaultOpnameNumber' => $todayOpname?->opname_number ?? $this->generateOpnameNumber(),
             'defaultOpnameDate' => now()->toDateString(),
             'summary' => [
                 'total_medicines' => $rows->count(),
@@ -1006,22 +895,19 @@ class StockController extends Controller
     }
 
     /**
-     * Display the draft and approved stock-opname documents on a dedicated page.
+     * Display saved stock-opname documents on a dedicated page.
      */
     public function opnameDraftIndex(Request $request): View
     {
-        $status = trim((string) $request->string('status', 'all'));
-        $status = in_array($status, ['all', 'draft', 'approved'], true) ? $status : 'all';
         $today = now()->toDateString();
         $dateFrom = trim((string) $request->string('date_from', $today));
         $dateTo = trim((string) $request->string('date_to', $today));
 
         return view('stocks.opname-drafts', [
             ...$this->pageData('stok-batch.stok-opname'),
-            'status' => $status,
             'dateFrom' => $dateFrom,
             'dateTo' => $dateTo,
-            'recentOpnames' => $this->stockOpnameHistoryRows($status, $dateFrom, $dateTo),
+            'recentOpnames' => $this->stockOpnameHistoryRows($dateFrom, $dateTo),
         ]);
     }
 
@@ -1032,7 +918,6 @@ class StockController extends Controller
     {
         $stockOpname->load([
             'creator:id,name',
-            'approver:id,name',
             'items.medicine:id,code,name,small_unit',
         ]);
 
@@ -1077,20 +962,65 @@ class StockController extends Controller
      */
     public function opnameStore(Request $request): RedirectResponse
     {
-        $requestedOpnameDate = trim((string) $request->input('opname_date', ''));
+        return $this->saveOpnameDraft($request);
+    }
 
-        if ($requestedOpnameDate !== '' && StockOpname::query()->whereDate('opname_date', $requestedOpnameDate)->exists()) {
-            return redirect()
-                ->route('stok-batch.stok-opname')
-                ->withInput()
-                ->with('toast', [
-                    'type' => 'error',
-                    'message' => 'Stok opname hanya bisa dibuat satu kali dalam satu hari.',
-                ]);
+    public function opnameEdit(StockOpname $stockOpname): View
+    {
+        $stockOpname->load('items.medicine.principal', 'items.stockBatch', 'items.storageLocation');
+        $rows = $stockOpname->items->map(function (StockOpnameItem $item): array {
+            $difference = (float) $item->difference_quantity;
+
+            return [
+                'medicine_id' => $item->medicine_id,
+                'stock_batch_id' => $item->stock_batch_id,
+                'storage_location_id' => $item->storage_location_id,
+                'medicine_code' => $item->medicine?->code ?: '-',
+                'medicine_name' => $item->medicine?->name ?: '-',
+                'principal_name' => $item->medicine?->principal?->name ?: '-',
+                'batch_count' => $item->stockBatch ? 1 : 0,
+                'batch_summary' => $item->stockBatch?->batch_number ?: '-',
+                'location_name' => $item->storageLocation?->name ?: '-',
+                'system_quantity' => (float) $item->system_quantity,
+                'system_quantity_label' => $this->formatWholeQuantity((float) $item->system_quantity),
+                'physical_quantity' => (float) $item->physical_quantity,
+                'purchase_price' => $difference != 0
+                    ? round((float) $item->adjustment_value / $difference, 2)
+                    : (float) ($item->medicine?->purchase_price ?? 0),
+            ];
+        });
+
+        return view('stocks.opname', [
+            ...$this->pageData('stok-batch.stok-opname'),
+            'editingOpname' => $stockOpname,
+            'rows' => $rows,
+            'search' => '',
+            'locations' => collect(),
+            'defaultOpnameNumber' => $stockOpname->opname_number,
+            'defaultOpnameDate' => $stockOpname->opname_date->toDateString(),
+        ]);
+    }
+
+    public function opnameUpdate(Request $request, StockOpname $stockOpname): RedirectResponse
+    {
+        return $this->saveOpnameDraft($request, $stockOpname);
+    }
+
+    private function saveOpnameDraft(Request $request, ?StockOpname $stockOpname = null): RedirectResponse
+    {
+        if ($request->has('items_payload')) {
+            $request->validate(['items_payload' => ['required', 'json']]);
+            $request->merge(['items' => json_decode($request->input('items_payload'), true)]);
         }
 
+        $requestedOpnameDate = trim((string) $request->input('opname_date', ''));
+        $sameDayOpname = $stockOpname ?? ($requestedOpnameDate !== ''
+            ? StockOpname::query()->whereDate('opname_date', $requestedOpnameDate)->latest('id')->first()
+            : null);
+        $isSameDayAppend = $stockOpname === null && $sameDayOpname !== null;
+
         $validated = $request->validate([
-            'opname_number' => ['required', 'string', 'max:50', 'unique:stock_opnames,opname_number'],
+            'opname_number' => ['required', 'string', 'max:50', Rule::unique('stock_opnames', 'opname_number')->ignore($sameDayOpname?->id)],
             'opname_date' => ['required', 'date'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array'],
@@ -1104,7 +1034,7 @@ class StockController extends Controller
 
         $items = collect($validated['items'])
             ->map(function (array $item): ?array {
-                if ($item['physical_quantity'] === null || $item['physical_quantity'] === '') {
+                if (($item['physical_quantity'] ?? null) === null || $item['physical_quantity'] === '') {
                     return null;
                 }
 
@@ -1133,84 +1063,126 @@ class StockController extends Controller
                 ]);
         }
 
-        DB::transaction(function () use ($validated, $items): void {
-            $opname = StockOpname::query()->create([
+        if ($isSameDayAppend) {
+            $duplicateMedicineIds = $items
+                ->pluck('medicine_id')
+                ->intersect($sameDayOpname->items()->pluck('medicine_id'))
+                ->unique()
+                ->values();
+
+            if ($duplicateMedicineIds->isNotEmpty()) {
+                $medicineNames = Medicine::query()
+                    ->whereIn('id', $duplicateMedicineIds->all())
+                    ->orderBy('name')
+                    ->pluck('name')
+                    ->implode(', ');
+
+                return back()
+                    ->withInput()
+                    ->with('toast', [
+                        'type' => 'error',
+                        'message' => 'Obat '.$medicineNames.' sudah tercatat pada stok opname hari ini.',
+                    ]);
+            }
+        }
+
+        DB::transaction(function () use ($validated, $items, $sameDayOpname, $isSameDayAppend): void {
+            $attributes = [
                 'opname_number' => $validated['opname_number'],
                 'opname_date' => $validated['opname_date'],
                 'status' => 'draft',
                 'notes' => trim((string) ($validated['notes'] ?? '')) ?: null,
-                'created_by' => auth()->id(),
-            ]);
+            ];
+            if ($sameDayOpname) {
+                $opname = StockOpname::query()->lockForUpdate()->findOrFail($sameDayOpname->id);
+                $opname->update([...$attributes, 'opname_number' => $opname->opname_number]);
+            } else {
+                $opname = StockOpname::query()->create([...$attributes, 'created_by' => auth()->id()]);
+            }
 
-            $opname->items()->createMany(
-                $items->map(function (array $item): array {
-                    $differenceQuantity = (float) $item['difference_quantity'];
+            $itemAttributes = $items->map(function (array $item): array {
+                $differenceQuantity = (float) $item['difference_quantity'];
 
-                    return [
-                        'stock_batch_id' => $item['stock_batch_id'],
-                        'medicine_id' => $item['medicine_id'],
-                        'storage_location_id' => $item['storage_location_id'],
-                        'system_quantity' => $item['system_quantity'],
-                        'physical_quantity' => $item['physical_quantity'],
-                        'difference_quantity' => $differenceQuantity,
-                        'adjustment_value' => round($differenceQuantity * (float) $item['average_unit_cost'], 2),
-                    ];
-                })->all()
-            );
+                return [
+                    'stock_batch_id' => $item['stock_batch_id'],
+                    'medicine_id' => $item['medicine_id'],
+                    'storage_location_id' => $item['storage_location_id'],
+                    'system_quantity' => $item['system_quantity'],
+                    'physical_quantity' => $item['physical_quantity'],
+                    'difference_quantity' => $differenceQuantity,
+                    'adjustment_value' => round($differenceQuantity * (float) $item['average_unit_cost'], 2),
+                ];
+            });
+
+            if (! $sameDayOpname) {
+                $opname->items()->createMany($itemAttributes->all());
+
+                return;
+            }
+
+            $existingItems = $opname->items()->lockForUpdate()->get();
+            $duplicateMedicineIds = $itemAttributes
+                ->pluck('medicine_id')
+                ->intersect($existingItems->pluck('medicine_id'))
+                ->unique()
+                ->values();
+
+            if ($isSameDayAppend && $duplicateMedicineIds->isNotEmpty()) {
+                $medicineNames = Medicine::query()
+                    ->whereIn('id', $duplicateMedicineIds->all())
+                    ->orderBy('name')
+                    ->pluck('name')
+                    ->implode(', ');
+
+                throw ValidationException::withMessages([
+                    'items' => 'Obat '.$medicineNames.' sudah tercatat pada stok opname hari ini.',
+                ]);
+            }
+
+            $retainedIds = [];
+            foreach ($itemAttributes as $attributes) {
+                $existing = $existingItems->first(fn (StockOpnameItem $item): bool => ! in_array($item->id, $retainedIds, true)
+                    && (int) $item->medicine_id === (int) $attributes['medicine_id']);
+                if (! $existing) {
+                    $opname->items()->create($attributes);
+
+                    continue;
+                }
+                $retainedIds[] = $existing->id;
+                $existing->fill($attributes);
+                if ($existing->isDirty()) {
+                    $this->resetOpnameItemAdjustment($existing);
+                    $existing->save();
+                }
+            }
+            foreach ($existingItems as $existing) {
+                if (! $isSameDayAppend && ! in_array($existing->id, $retainedIds, true)) {
+                    $this->resetOpnameItemAdjustment($existing);
+                    $existing->delete();
+                }
+            }
         });
 
         return redirect()
-            ->route('stok-batch.stok-opname')
+            ->route($sameDayOpname && ! $isSameDayAppend ? 'stok-batch.stok-opname.draft' : 'stok-batch.stok-opname')
             ->with('toast', [
                 'type' => 'success',
-                'message' => 'Draft stok opname berhasil disimpan.',
+                'message' => $isSameDayAppend
+                    ? 'Data stok opname berhasil disimpan ke dokumen hari ini.'
+                    : ($sameDayOpname ? 'Draft stok opname berhasil diperbarui.' : 'Draft stok opname berhasil disimpan.'),
             ]);
     }
 
-    /**
-     * Approve a stock opname draft as an audit document only.
-     */
-    public function opnameApprove(StockOpname $stockOpname): RedirectResponse
+    private function resetOpnameItemAdjustment(StockOpnameItem $item): void
     {
-        if ($stockOpname->status !== 'draft') {
-            return redirect()
-                ->route('stok-batch.stok-opname')
-                ->with('toast', [
-                    'type' => 'error',
-                    'message' => 'Dokumen stok opname ini sudah diproses sebelumnya.',
-                ]);
-        }
-
         try {
-            DB::transaction(function () use ($stockOpname): void {
-                $lockedOpname = StockOpname::query()
-                    ->lockForUpdate()
-                    ->findOrFail($stockOpname->id);
-
-                if ($lockedOpname->status !== 'draft') {
-                    throw new RuntimeException('Dokumen stok opname ini sudah diproses sebelumnya.');
-                }
-
-                $lockedOpname->update([
-                    'status' => 'approved',
-                    'approved_by' => auth()->id(),
-                ]);
-            });
+            $this->rollbackAdjustmentOrFail($item);
+            $item->followUp?->delete();
         } catch (RuntimeException $exception) {
-            return redirect()
-                ->route('stok-batch.stok-opname')
-                ->with('toast', [
-                    'type' => 'error',
-                    'message' => $exception->getMessage(),
-                ]);
-        }
-
-        return redirect()
-            ->route('stok-batch.stok-opname')
-            ->with('toast', [
-                'type' => 'success',
-                'message' => 'Stok opname berhasil di-approve sebagai hasil audit. Stok real belum diubah.',
+            throw ValidationException::withMessages([
+                'items' => 'Koreksi stok opname belum dapat disimpan: '.$exception->getMessage(),
             ]);
+        }
     }
 
     /**
@@ -1223,6 +1195,12 @@ class StockController extends Controller
                 $lockedOpname = StockOpname::query()
                     ->lockForUpdate()
                     ->findOrFail($stockOpname->id);
+
+                if ($lockedOpname->items()
+                    ->whereHas('followUp', fn (Builder $query) => $query->where('status', 'applied'))
+                    ->exists()) {
+                    throw new RuntimeException('Stok opname tidak dapat dihapus karena penyesuaian stoknya sudah diterapkan. Kembalikan stok dari dokumen penyesuaian terlebih dahulu.');
+                }
 
                 $lockedOpname->items()->delete();
                 $lockedOpname->delete();
@@ -1257,6 +1235,8 @@ class StockController extends Controller
                 'stockBatches' => function ($query) use ($locationId): void {
                     $query
                         ->with('storageLocation:id,name')
+                        ->where('status', 'active')
+                        ->where('quantity_balance', '>', 0)
                         ->when($locationId !== null, fn (Builder $builder) => $builder->where('storage_location_id', $locationId))
                         ->orderBy('expiry_date')
                         ->orderBy('batch_number');
@@ -2065,8 +2045,7 @@ class StockController extends Controller
         Collection $saleReferences,
         Collection $saleReturnReferences,
         Collection $stockOpnameReferences
-    ): array
-    {
+    ): array {
         $invoiceNumber = $movement->stockBatch?->purchaseInvoiceItem?->invoice?->invoice_number;
         $supplierName = $movement->stockBatch?->purchaseInvoiceItem?->invoice?->supplier?->name;
 
@@ -2221,12 +2200,11 @@ class StockController extends Controller
      *
      * @return Collection<int, array<string, mixed>>
      */
-    private function stockOpnameHistoryRows(string $status = 'all', string $dateFrom = '', string $dateTo = ''): Collection
+    private function stockOpnameHistoryRows(string $dateFrom = '', string $dateTo = ''): Collection
     {
         return StockOpname::query()
             ->withCount('items')
             ->with(['creator:id,name'])
-            ->when($status !== 'all', fn (Builder $builder) => $builder->where('status', $status))
             ->when($dateFrom !== '', fn (Builder $builder) => $builder->whereDate('opname_date', '>=', $dateFrom))
             ->when($dateTo !== '', fn (Builder $builder) => $builder->whereDate('opname_date', '<=', $dateTo))
             ->latest('opname_date')
@@ -2246,7 +2224,6 @@ class StockController extends Controller
                     'id' => $opname->id,
                     'number' => $opname->opname_number,
                     'date' => $opname->opname_date?->translatedFormat('d M Y') ?: '-',
-                    'status' => $opname->status,
                     'item_count' => (int) $opname->items_count,
                     'created_by' => $opname->creator?->name ?: '-',
                     'total_more' => $this->formatWholeQuantity((float) ($totals?->total_more ?? 0)),
@@ -2454,15 +2431,6 @@ class StockController extends Controller
     /**
      * Resolve the proper redirect after canceling a processed follow-up.
      */
-    private function followUpCancelRedirect(Request $request, StockOpnameItem $stockOpnameItem): RedirectResponse
-    {
-        if ($request->string('redirect_to')->toString() === 'internal-billing') {
-            return redirect()->route('keuangan.riwayat-tagihan-internal');
-        }
-
-        return redirect()->route('stok-batch.penyesuaian-stok.follow-up', $stockOpnameItem->id);
-    }
-
     /**
      * Generate the next stock opname number.
      */

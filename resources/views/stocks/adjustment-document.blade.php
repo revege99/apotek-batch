@@ -12,16 +12,15 @@
             <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div class="space-y-2">
                     <div class="flex flex-wrap items-center gap-2">
-                        <h2 class="page-title text-[1.05rem]">Dokumen Tindak Lanjut {{ $stockOpname->opname_number }}</h2>
+                        <h2 class="page-title text-[1.05rem]">Penyesuaian Stok — No Opname {{ $stockOpname->opname_number }}</h2>
                         <span class="inline-flex rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[0.64rem] font-semibold uppercase tracking-[0.14em] text-emerald-700">
-                            approved
+                            Tersimpan
                         </span>
                     </div>
 
                     <div class="flex flex-wrap gap-x-5 gap-y-1 text-[0.74rem] text-slate-600">
                         <span>Tanggal {{ $stockOpname->opname_date?->translatedFormat('d M Y') ?? '-' }}</span>
                         <span>Dibuat oleh {{ $stockOpname->creator?->name ?? '-' }}</span>
-                        <span>Approved oleh {{ $stockOpname->approver?->name ?? '-' }}</span>
                     </div>
 
                     @if (filled($stockOpname->notes))
@@ -30,6 +29,18 @@
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
+                    @if ($summary['item_count'] > $summary['applied_count'])
+                        <form method="POST" action="{{ route('stok-batch.penyesuaian-stok.apply', $stockOpname) }}">
+                            @csrf
+                            <button class="ui-action-btn ui-action-btn--soft px-3" type="submit">Terapkan ke stok</button>
+                        </form>
+                    @endif
+                    @if ($summary['applied_count'] > 0)
+                        <form method="POST" action="{{ route('stok-batch.penyesuaian-stok.restore', $stockOpname) }}">
+                            @csrf
+                            <button class="ui-action-btn ui-action-btn--neutral px-3" type="submit">Kembalikan stok</button>
+                        </form>
+                    @endif
                     <a href="{{ route('stok-batch.penyesuaian-stok') }}" class="ui-action-btn ui-action-btn--soft inline-flex items-center gap-2 px-3 text-[0.74rem]">
                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M15 18l-6-6 6-6" />
@@ -43,21 +54,6 @@
                         </svg>
                         Lihat hasil opname
                     </a>
-                    @if ($summary['item_count'] > 0 && $summary['applied_count'] < $summary['item_count'])
-                        <form method="POST" action="{{ route('stok-batch.penyesuaian-stok.dokumen.process', $stockOpname->id) }}">
-                            @csrf
-                            <button type="submit" class="ui-action-btn ui-action-btn--soft inline-flex items-center gap-2 px-3 text-[0.74rem]">
-                                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M20 6 9 17l-5-5" />
-                                </svg>
-                                Proses tindak lanjut
-                            </button>
-                        </form>
-                    @elseif ($summary['item_count'] > 0)
-                        <span class="inline-flex rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-[0.72rem] font-semibold text-emerald-700">
-                            Semua item sudah diproses
-                        </span>
-                    @endif
                 </div>
             </div>
         </section>
@@ -88,82 +84,9 @@
             </div>
         </section>
 
-        <section class="panel-surface overflow-visible p-0">
-            <div class="overflow-x-auto">
-                <table class="min-w-[980px] w-full divide-y divide-slate-200/80 text-[0.72rem]">
-                    <thead class="bg-slate-50/90">
-                        <tr class="text-left text-[0.66rem] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                            <th class="px-3 py-2.5">Obat</th>
-                            <th class="px-2 py-2.5 text-center">Stok Sistem</th>
-                            <th class="px-2 py-2.5 text-center">Stok Fisik</th>
-                            <th class="px-2 py-2.5 text-center">Hilang</th>
-                            <th class="px-2 py-2.5 text-center">Lebih</th>
-                            <th class="px-2 py-2.5 text-right">Nilai Selisih</th>
-                            <th class="px-2 py-2.5">No tindak lanjut</th>
-                            <th class="px-2 py-2.5 text-center">Status</th>
-                            <th class="px-2 py-2.5 text-center">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-200/80 bg-white">
-                        @forelse ($rows as $item)
-                            @php
-                                $difference = (float) $item->difference_quantity;
-                                $followUp = $item->followUp;
-                                $statusClass = match ($followUp?->status) {
-                                    'applied' => 'border-emerald-100 bg-emerald-50 text-emerald-700',
-                                    'draft' => 'border-sky-100 bg-sky-50 text-sky-700',
-                                    default => 'border-amber-100 bg-amber-50 text-amber-700',
-                                };
-                                $statusLabel = match ($followUp?->status) {
-                                    'applied' => 'Sudah diproses',
-                                    'draft' => 'Draft berjalan',
-                                    default => 'Belum ditindaklanjuti',
-                                };
-                            @endphp
-                            <tr>
-                                <td class="px-3 py-2.5">
-                                    <div class="font-semibold text-slate-900">{{ $item->medicine?->name ?: '-' }}</div>
-                                    <div class="mt-1 text-[0.66rem] text-slate-400">{{ $item->medicine?->code ?: '-' }}</div>
-                                </td>
-                                <td class="px-2 py-2.5 text-center font-semibold text-slate-900">{{ number_format((float) $item->system_quantity, 0, ',', '.') }}</td>
-                                <td class="px-2 py-2.5 text-center font-semibold text-slate-900">{{ number_format((float) $item->physical_quantity, 0, ',', '.') }}</td>
-                                <td class="px-2 py-2.5 text-center font-semibold text-rose-700">{{ $difference < 0 ? number_format(abs($difference), 0, ',', '.') : '-' }}</td>
-                                <td class="px-2 py-2.5 text-center font-semibold text-sky-700">{{ $difference > 0 ? number_format($difference, 0, ',', '.') : '-' }}</td>
-                                <td class="px-2 py-2.5 text-right font-semibold {{ (float) $item->adjustment_value >= 0 ? 'text-emerald-700' : 'text-rose-700' }}">
-                                    {{ (float) $item->adjustment_value >= 0 ? 'Rp '.number_format((float) $item->adjustment_value, 0, ',', '.') : '-Rp '.number_format(abs((float) $item->adjustment_value), 0, ',', '.') }}
-                                </td>
-                                <td class="px-2 py-2.5 text-[0.68rem] text-slate-700">{{ $followUp?->adjustment_number ?: '-' }}</td>
-                                <td class="px-2 py-2.5 text-center">
-                                    <span class="inline-flex rounded-full border px-2 py-1 text-[0.6rem] font-semibold uppercase tracking-[0.12em] {{ $statusClass }}">
-                                        {{ $statusLabel }}
-                                    </span>
-                                </td>
-                                <td class="px-2 py-2.5 text-center">
-                                    <a
-                                        href="{{ route('stok-batch.penyesuaian-stok.follow-up', $item->id) }}"
-                                        title="{{ $followUp?->status === 'applied' ? 'Lihat proses' : ($followUp ? 'Lanjutkan draft' : 'Atur item') }}"
-                                        aria-label="{{ $followUp?->status === 'applied' ? 'Lihat proses' : ($followUp ? 'Lanjutkan draft' : 'Atur item') }}"
-                                        class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
-                                    >
-                                        <svg class="h-4 w-4 text-slate-600" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                            <circle cx="5" cy="12" r="1.8" />
-                                            <circle cx="12" cy="12" r="1.8" />
-                                            <circle cx="19" cy="12" r="1.8" />
-                                        </svg>
-                                        <span class="sr-only">Aksi</span>
-                                    </a>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="9" class="px-5 py-12 text-center text-[0.78rem] text-slate-500">
-                                    Tidak ada item selisih pada dokumen ini.
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-        </section>
+        @if ($errors->any())
+            <section class="panel-surface px-4 py-3 text-rose-700">{{ $errors->first() }}</section>
+        @endif
+        @include('stocks.adjustment-table')
     </div>
 </x-app-layout>

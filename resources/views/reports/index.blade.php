@@ -209,41 +209,32 @@
                         </tbody>
                     </table>
                 @elseif ($mode === 'writeoff_loss')
-                    <table class="min-w-[1180px] w-full divide-y divide-slate-200/80 text-[0.76rem]">
+                    <table class="min-w-[900px] w-full divide-y divide-slate-200/80 text-[0.76rem]">
                         <thead class="bg-slate-50/90">
                             <tr class="text-left text-[0.66rem] font-semibold uppercase tracking-[0.14em] text-slate-400">
                                 <th class="px-4 py-3">Tanggal Proses</th>
-                                <th class="px-3 py-3">No Tindak Lanjut</th>
                                 <th class="px-3 py-3">No Opname</th>
-                                <th class="px-3 py-3">Obat</th>
-                                <th class="px-3 py-3">Batch</th>
-                                <th class="px-3 py-3">Lokasi</th>
+                                <th class="px-3 py-3 text-center">Obat Hilang</th>
                                 <th class="px-3 py-3 text-right">Qty Hilang</th>
-                                <th class="px-3 py-3 text-right">Harga Beli</th>
                                 <th class="px-3 py-3 text-right">Nilai Hilang</th>
                                 <th class="px-3 py-3">Diproses Oleh</th>
+                                <th class="px-3 py-3 text-center">Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-200/80 bg-white">
                             @forelse ($rows as $row)
                                 <tr>
                                     <td class="px-4 py-3 text-slate-700">{{ $row->movement_date?->translatedFormat('d M Y H:i') ?? '-' }}</td>
-                                    <td class="px-3 py-3 font-semibold text-slate-900">{{ $row->adjustment_number ?: '-' }}</td>
                                     <td class="px-3 py-3 text-slate-700">{{ $row->opname_number ?: '-' }}</td>
-                                    <td class="px-3 py-3">
-                                        <p class="font-semibold text-slate-900">{{ $row->medicine_name ?: '-' }}</p>
-                                        <p class="mt-1 text-[0.66rem] text-slate-400">{{ $row->medicine_code ?: '-' }}</p>
-                                    </td>
-                                    <td class="px-3 py-3 text-slate-700">{{ $row->batch_number ?: '-' }}</td>
-                                    <td class="px-3 py-3 text-slate-700">{{ $row->location_name ?: '-' }}</td>
-                                    <td class="px-3 py-3 text-right font-semibold text-rose-700">{{ number_format((float) $row->quantity_out, 0, ',', '.') }} {{ $row->small_unit ?: '' }}</td>
-                                    <td class="px-3 py-3 text-right text-slate-700">Rp {{ number_format((float) $row->unit_cost, 0, ',', '.') }}</td>
-                                    <td class="px-3 py-3 text-right font-semibold text-rose-700">Rp {{ number_format((float) $row->quantity_out * (float) $row->unit_cost, 0, ',', '.') }}</td>
+                                    <td class="px-3 py-3 text-center font-semibold text-slate-900">{{ number_format($row->item_count) }}</td>
+                                    <td class="px-3 py-3 text-right font-semibold text-rose-700">{{ number_format((float) $row->total_quantity, 0, ',', '.') }}</td>
+                                    <td class="px-3 py-3 text-right font-semibold text-rose-700">Rp {{ number_format((float) $row->total_value, 0, ',', '.') }}</td>
                                     <td class="px-3 py-3 text-slate-700">{{ $row->processed_by_name ?: '-' }}</td>
+                                    <td class="px-3 py-3 text-center"><a href="{{ route('stok-batch.penyesuaian-stok.dokumen', $row->stock_opname_id) }}" class="ui-action-btn ui-action-btn--soft px-3 text-[0.7rem]">Lihat</a></td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="10" class="px-5 py-14 text-center">
+                                    <td colspan="7" class="px-5 py-14 text-center">
                                         <div class="empty-title">Belum ada data hilang biasa pada periode ini</div>
                                     </td>
                                 </tr>
