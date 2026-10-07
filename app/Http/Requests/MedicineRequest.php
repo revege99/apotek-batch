@@ -52,7 +52,7 @@ class MedicineRequest extends FormRequest
             : null;
     }
 
-    private function normalizePurchasePrice(mixed $value): ?int
+    private function normalizePurchasePrice(mixed $value): ?float
     {
         if ($value === null) {
             return null;
@@ -65,34 +65,17 @@ class MedicineRequest extends FormRequest
         }
 
         if (preg_match('/^-?\d{1,3}(?:\.\d{3})+(?:,\d+)?$/', $normalized) === 1) {
-            $isNegative = str_starts_with($normalized, '-');
-            $integerPart = explode(',', ltrim($normalized, '-'), 2)[0];
-            $digits = preg_replace('/\D+/', '', $integerPart) ?? '';
-
-            if ($digits === '') {
-                return null;
-            }
-
-            return ($isNegative ? -1 : 1) * (int) $digits;
+            return round((float) str_replace(',', '.', str_replace('.', '', $normalized)), 2);
         }
 
         if (is_numeric($normalized)) {
-            return (int) ((float) $normalized);
+            return round((float) $normalized, 2);
         }
-
-        $isNegative = str_starts_with($normalized, '-');
 
         if (str_contains($normalized, ',')) {
-            $normalized = explode(',', $normalized, 2)[0];
+            $normalized = str_replace(',', '.', str_replace('.', '', $normalized));
         }
-
-        $digits = preg_replace('/\D+/', '', $normalized) ?? '';
-
-        if ($digits === '') {
-            return null;
-        }
-
-        return ($isNegative ? -1 : 1) * (int) $digits;
+        return is_numeric($normalized) ? round((float) $normalized, 2) : null;
     }
 
     /**

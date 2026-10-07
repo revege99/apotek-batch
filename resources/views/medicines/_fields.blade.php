@@ -40,14 +40,13 @@
         $purchasePriceText = trim((string) $rawPurchasePrice);
 
         if (str_contains($purchasePriceText, ',')) {
-            $purchasePriceText = explode(',', $purchasePriceText, 2)[0];
-        } elseif (preg_match('/^\d{1,3}(?:\.\d{3})+$/', $purchasePriceText) !== 1 && is_numeric($purchasePriceText)) {
-            $purchasePriceText = (string) ((int) ((float) $purchasePriceText));
+            $purchasePriceText = str_replace(',', '.', str_replace('.', '', $purchasePriceText));
+        } elseif (preg_match('/^\d{1,3}(?:\.\d{3})+$/', $purchasePriceText) === 1) {
+            $purchasePriceText = str_replace('.', '', $purchasePriceText);
         }
 
-        $purchasePriceDigits = preg_replace('/\D+/', '', $purchasePriceText) ?? '';
-        $purchasePriceDisplay = $purchasePriceDigits !== ''
-            ? number_format((int) $purchasePriceDigits, 0, ',', '.')
+        $purchasePriceDisplay = is_numeric($purchasePriceText)
+            ? rtrim(rtrim(number_format((float) $purchasePriceText, 2, ',', '.'), '0'), ',')
             : '';
     }
 
@@ -222,10 +221,10 @@
             id="{{ $fieldPrefix }}purchase_price"
             name="purchase_price"
             type="text"
-            inputmode="numeric"
+            inputmode="decimal"
             autocomplete="off"
             value="{{ $purchasePriceDisplay }}"
-            placeholder="Contoh: 2.500"
+            placeholder="Contoh: 2.500,50"
             @input="formatInput($event)"
             class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-100"
         >

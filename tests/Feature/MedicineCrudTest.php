@@ -131,7 +131,7 @@ class MedicineCrudTest extends TestCase
         ]);
     }
 
-    public function test_user_can_update_medicine_with_formatted_purchase_price_without_decimal_fraction(): void
+    public function test_user_can_update_medicine_with_formatted_purchase_price_with_decimal_fraction(): void
     {
         $user = User::factory()->create();
         $principal = Principal::query()->create([
@@ -161,7 +161,7 @@ class MedicineCrudTest extends TestCase
 
         $this->assertDatabaseHas('medicines', [
             'id' => $medicine->id,
-            'purchase_price' => 7500,
+            'purchase_price' => 7500.90,
         ]);
     }
 

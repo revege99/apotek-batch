@@ -20,6 +20,16 @@ document.addEventListener('alpine:init', () => {
         minimumFractionDigits: 0,
         maximumFractionDigits: 2,
     });
+    const moneyInputFormatter = new Intl.NumberFormat('id-ID', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+    });
+    const currencyDecimalFormatter = new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+    });
     const toNumber = (value, fallback = 0) => {
         const parsed = Number(value);
 
@@ -27,6 +37,31 @@ document.addEventListener('alpine:init', () => {
     };
     const roundCurrency = (value) => Math.round((value + Number.EPSILON) * 100) / 100;
     const roundWholeCurrency = (value) => Math.round(toNumber(value, 0));
+    const normalizeMoneyInput = (value) => {
+        const rawValue = String(value ?? '').trim();
+
+        if (rawValue === '') {
+            return '';
+        }
+
+        const sanitized = rawValue.replace(/[^\d.,]/g, '');
+
+        if (sanitized.includes(',')) {
+            return sanitized.replace(/\./g, '').replace(',', '.');
+        }
+
+        return sanitized.replace(/\./g, '');
+    };
+    const formatTypingMoneyInput = (value) => {
+        const raw = String(value ?? '').replace(/[^\d.,]/g, '');
+        const [whole, fraction] = raw.split(',');
+        const digits = whole.replace(/\./g, '');
+        const formattedWhole = digits === '' ? '' : integerFormatter.format(Number(digits));
+
+        return fraction === undefined
+            ? formattedWhole
+            : `${formattedWhole || '0'},${fraction.replace(/\D/g, '').slice(0, 2)}`;
+    };
     const formatMedicinePriceInput = (value, inputType = '') => {
         const rawValue = String(value ?? '').trim();
         const isDeleteAction = String(inputType ?? '').startsWith('delete');
@@ -370,7 +405,7 @@ document.addEventListener('alpine:init', () => {
 
     Alpine.data('medicinePriceInput', () => ({
         formatInput(event) {
-            event.target.value = formatMedicinePriceInput(event.target.value, event.inputType ?? '');
+            event.target.value = formatTypingMoneyInput(event.target.value);
         },
     }));
 
@@ -897,14 +932,17 @@ document.addEventListener('alpine:init', () => {
         },
 
         handleMoneyInput(row, field, event) {
-            const value = this.parseMoneyInput(event.target.value);
+            const display = formatTypingMoneyInput(event.target.value);
+            const value = this.parseMoneyInput(display);
 
             row[field] = value;
-            row[`${field}_display`] = this.formatMoneyInput(value);
+            row[`${field}_display`] = display;
             event.target.value = row[`${field}_display`];
 
             if (field === 'discount_amount') {
                 this.applyAmount(row);
+                row[`${field}_display`] = display;
+                event.target.value = display;
                 return;
             }
 
@@ -912,10 +950,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         parseMoneyInput(value) {
-            const normalized = String(value ?? '')
-                .replace(/\./g, '')
-                .replace(',', '.')
-                .replace(/[^\d.]/g, '');
+            const normalized = normalizeMoneyInput(value);
             const parsed = Number(normalized);
 
             if (normalized === '' || ! Number.isFinite(parsed)) {
@@ -930,7 +965,7 @@ document.addEventListener('alpine:init', () => {
                 return '';
             }
 
-            return numberFormatter.format(roundCurrency(Math.max(toNumber(value, 0), 0)));
+            return moneyInputFormatter.format(roundCurrency(Math.max(toNumber(value, 0), 0)));
         },
 
         syncDiscountAmountDisplay(row) {
@@ -939,9 +974,7 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
-            row.discount_amount_display = integerFormatter.format(
-                Math.max(roundWholeCurrency(row.discount_amount), 0),
-            );
+            row.discount_amount_display = this.formatMoneyInput(row.discount_amount);
         },
 
         applyPercent(row) {
@@ -962,7 +995,7 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
-            const amount = roundWholeCurrency(gross * percent / 100);
+            const amount = roundCurrency(gross * percent / 100);
 
             row.discount_amount = amount > 0 ? String(amount) : '';
             this.syncDiscountAmountDisplay(row);
@@ -971,7 +1004,7 @@ document.addEventListener('alpine:init', () => {
 
         applyAmount(row) {
             const gross = this.rowGross(row);
-            let amount = Math.max(roundWholeCurrency(row.discount_amount), 0);
+            let amount = Math.max(roundCurrency(toNumber(row.discount_amount, 0)), 0);
 
             row.discount_mode = 'amount';
 
@@ -986,7 +1019,7 @@ document.addEventListener('alpine:init', () => {
                 amount = gross;
             }
 
-            amount = roundWholeCurrency(amount);
+            amount = roundCurrency(amount);
             row.discount_amount = amount > 0 ? String(amount) : '';
 
             const percent = gross > 0 ? roundCurrency((amount / gross) * 100) : 0;
@@ -1081,7 +1114,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         currency(value) {
-            return currencyFormatter.format(roundCurrency(toNumber(value, 0)));
+            return currencyDecimalFormatter.format(roundCurrency(toNumber(value, 0)));
         },
 
         formatQuantity(value) {
@@ -1446,7 +1479,8 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
-            const parsedValue = this.parseMoneyInput(event?.target?.value ?? row.unit_price_display);
+            const display = formatTypingMoneyInput(event?.target?.value ?? row.unit_price_display);
+            const parsedValue = this.parseMoneyInput(display);
             const unitPrice = roundCurrency(Math.max(toNumber(parsedValue, 0), 0));
             const baseUnitCost = Math.max(toNumber(row.base_unit_cost, 0), 0);
             const markupPercentage = baseUnitCost > 0
@@ -1454,7 +1488,7 @@ document.addEventListener('alpine:init', () => {
                 : 0;
 
             row.unit_price = String(unitPrice);
-            row.unit_price_display = this.formatMoneyInput(unitPrice);
+            row.unit_price_display = display;
             row.markup_percentage = String(markupPercentage);
             row.manual_unit_price = true;
             event.target.value = row.unit_price_display;
@@ -2158,10 +2192,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         parseMoneyInput(value) {
-            const normalized = String(value ?? '')
-                .replace(/\./g, '')
-                .replace(',', '.')
-                .replace(/[^\d.]/g, '');
+            const normalized = normalizeMoneyInput(value);
             const parsed = Number(normalized);
 
             if (normalized === '' || ! Number.isFinite(parsed)) {
@@ -2176,7 +2207,7 @@ document.addEventListener('alpine:init', () => {
                 return '';
             }
 
-            return numberFormatter.format(roundCurrency(Math.max(toNumber(value, 0), 0)));
+            return moneyInputFormatter.format(roundCurrency(Math.max(toNumber(value, 0), 0)));
         },
 
         syncPaidAmountDisplay() {
@@ -2190,7 +2221,8 @@ document.addEventListener('alpine:init', () => {
         },
 
         handleOtherCostAmountInput(event) {
-            const parsedValue = this.parseMoneyInput(event?.target?.value ?? this.other_cost_amount_display);
+            const display = formatTypingMoneyInput(event?.target?.value ?? this.other_cost_amount_display);
+            const parsedValue = this.parseMoneyInput(display);
             const rawValue = String(parsedValue ?? '').trim();
 
             if (rawValue === '') {
@@ -2208,6 +2240,7 @@ document.addEventListener('alpine:init', () => {
             this.other_cost_amount = this.sanitizeMoneyValue(parsedValue);
             this.syncOtherCostAmountDisplay();
             this.syncPaidAmount();
+            this.other_cost_amount_display = display;
 
             if (event?.target) {
                 event.target.value = this.other_cost_amount_display;
@@ -2220,7 +2253,8 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
-            const parsedValue = this.parseMoneyInput(event?.target?.value ?? this.paid_amount_display);
+            const display = formatTypingMoneyInput(event?.target?.value ?? this.paid_amount_display);
+            const parsedValue = this.parseMoneyInput(display);
             const rawValue = String(parsedValue ?? '').trim();
 
             if (rawValue === '') {
@@ -2237,6 +2271,7 @@ document.addEventListener('alpine:init', () => {
             this.autoFillPaidAmount = false;
             this.paid_amount = this.sanitizeMoneyValue(parsedValue);
             this.syncPaidAmountDisplay();
+            this.paid_amount_display = display;
 
             if (event?.target) {
                 event.target.value = this.paid_amount_display;
@@ -2346,7 +2381,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         currency(value) {
-            return currencyFormatter.format(roundCurrency(toNumber(value, 0)));
+            return currencyDecimalFormatter.format(roundCurrency(toNumber(value, 0)));
         },
 
         formatQuantity(value) {
