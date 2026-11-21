@@ -155,6 +155,19 @@ class SaleController extends Controller
      */
     public function print(Sale $sale)
     {
+        return $this->renderSalePdf($sale);
+    }
+
+    /**
+     * Stream the alternate, larger-text sale invoice.
+     */
+    public function printCompact(Sale $sale)
+    {
+        return $this->renderSalePdf($sale, true);
+    }
+
+    private function renderSalePdf(Sale $sale, bool $largeText = false)
+    {
         $sale->load([
             'customer:id,name,address',
             'customerGroup:id,name,markup_percentage',
@@ -188,9 +201,10 @@ class SaleController extends Controller
             'customerAddress' => $sale->customer?->address ?: '-',
             'grandTotalWords' => $this->rupiahInWords((float) $sale->grand_total),
             'pharmacyAddressLine' => $this->pharmacyAddressLine($profile),
+            'largeText' => $largeText,
         ])->setPaper('a4');
 
-        return $pdf->stream('penjualan-'.$sale->sale_number.'.pdf');
+        return $pdf->stream('penjualan-'.$sale->sale_number.($largeText ? '-1' : '').'.pdf');
     }
 
     /**
@@ -832,6 +846,7 @@ class SaleController extends Controller
                     'quantity' => (string) $quantity,
                     'markup_percentage' => (string) round((float) $item->markup_percentage, 2),
                     'unit_price' => (string) round((float) $item->unit_price, 2),
+                    'manual_unit_price' => true,
                     'batches' => [[
                         'id' => $groupKey,
                         'group_key' => $groupKey,

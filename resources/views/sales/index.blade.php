@@ -234,6 +234,22 @@
                                                     <span>Print PDF</span>
                                                 </a>
 
+                                                <a
+                                                    href="{{ route('penjualan.data-penjualan.print-1', $sale) }}"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="flex w-full items-center gap-2 px-3 py-2 text-left text-[0.8rem] font-medium text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700"
+                                                    @click="close()"
+                                                >
+                                                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                                                        <path d="M6 9V4.75A1.75 1.75 0 0 1 7.75 3h8.5A1.75 1.75 0 0 1 18 4.75V9" />
+                                                        <path d="M6 18H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-1" />
+                                                        <path d="M8 14h8v7H8z" />
+                                                        <path d="M17 12h.01" />
+                                                    </svg>
+                                                    <span>Print PDF -1</span>
+                                                </a>
+
                                                 <button
                                                     type="button"
                                                     class="flex w-full items-center gap-2 px-3 py-2 text-left text-[0.8rem] font-medium text-rose-700 transition hover:bg-rose-50 hover:text-rose-800"

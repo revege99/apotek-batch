@@ -1170,7 +1170,9 @@ document.addEventListener('alpine:init', () => {
             if (hasHydratedPricing) {
                 this.rows.forEach((row) => {
                     this.syncBatchSelection(row);
-                    this.syncRowPricing(row);
+                    if (! row.manual_unit_price) {
+                        this.syncRowPricing(row);
+                    }
                     this.recalculateRow(row);
                 });
 

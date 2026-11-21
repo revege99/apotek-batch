@@ -188,6 +188,7 @@ Route::middleware(['auth', 'verified', 'menu.access'])->group(function () use ($
     Route::get('/penjualan/data-penjualan/{sale}/edit', [SaleController::class, 'edit'])->name('penjualan.data-penjualan.edit');
     Route::match(['put', 'patch'], '/penjualan/data-penjualan/{sale}', [SaleController::class, 'update'])->name('penjualan.data-penjualan.update');
     Route::get('/penjualan/data-penjualan/{sale}/print', [SaleController::class, 'print'])->name('penjualan.data-penjualan.print');
+    Route::get('/penjualan/data-penjualan/{sale}/print-1', [SaleController::class, 'printCompact'])->name('penjualan.data-penjualan.print-1');
     Route::delete('/penjualan/data-penjualan/{sale}', [SaleController::class, 'destroy'])->name('penjualan.data-penjualan.destroy');
     Route::middleware('license.active')->group(function () {
         Route::get('/penjualan/retur-penjualan', [SaleReturnController::class, 'index'])->name('penjualan.retur-penjualan');

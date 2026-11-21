@@ -16,7 +16,7 @@
             margin: 4px;
             color: #0f172a;
             font-family: "Times New Roman", serif;
-            font-size: 12.6px;
+            font-size: {{ ($largeText ?? false) ? '15px' : '12.6px' }};
             line-height: 1.35;
         }
 
@@ -40,7 +40,7 @@
 
         .brand-meta {
             margin: 1px 0;
-            font-size: 10.8px;
+            font-size: {{ ($largeText ?? false) ? '15px' : '10.8px' }};
             color: #334155;
         }
 
@@ -54,7 +54,7 @@
         }
 
         .document-number {
-            font-size: 12.6px;
+            font-size: {{ ($largeText ?? false) ? '18px' : '12.6px' }};
             font-weight: 700;
             text-align: right;
             margin: 0;
@@ -62,7 +62,7 @@
 
         .document-date {
             color: #475569;
-            font-size: 10.8px;
+            font-size: {{ ($largeText ?? false) ? '15px' : '10.8px' }};
             text-align: right;
             margin: 2px 0 0;
         }
@@ -83,7 +83,7 @@
             padding: 4px 6px;
             border-bottom: 1px solid #e2e8f0;
             vertical-align: top;
-            font-size: 11px;
+            font-size: {{ ($largeText ?? false) ? '15px' : '11px' }};
         }
 
         table.meta tr:last-child td {
@@ -117,18 +117,18 @@
 
         table.items th {
             background: #f1f5f9;
-            font-size: 10.8px;
+            font-size: {{ ($largeText ?? false) ? '15px' : '10.8px' }};
             font-weight: 700;
             padding: 5px 6px;
             text-transform: uppercase;
         }
 
         table.items td.batch-value {
-            font-size: 9px;
+            font-size: {{ ($largeText ?? false) ? '15px' : '9px' }};
         }
 
         table.items td {
-            font-size: 11px;
+            font-size: {{ ($largeText ?? false) ? '15px' : '11px' }};
             line-height: 1.1;
             padding: 2px 6px;
         }
@@ -168,7 +168,7 @@
 
         .summary td {
             padding: 1px 0;
-            font-size: 11px;
+            font-size: {{ ($largeText ?? false) ? '15px' : '11px' }};
         }
 
         .summary-label {
@@ -192,14 +192,14 @@
         }
 
         .spellout-title {
-            font-size: 10.8px;
+            font-size: {{ ($largeText ?? false) ? '15px' : '10.8px' }};
             font-weight: 700;
             margin-bottom: 3px;
         }
 
         .notes {
             margin-top: 8px;
-            font-size: 11px;
+            font-size: {{ ($largeText ?? false) ? '15px' : '11px' }};
             color: #334155;
         }
 
@@ -221,16 +221,18 @@
         .sign-title {
             text-align: center;
             margin-bottom: 48px;
+            font-size: {{ ($largeText ?? false) ? '15px' : '12.6px' }};
         }
 
         .sign-name {
             text-align: center;
             font-weight: 700;
+            font-size: {{ ($largeText ?? false) ? '15px' : '12.6px' }};
         }
 
         .muted {
             color: #475569;
-            font-size: 10px;
+            font-size: {{ ($largeText ?? false) ? '15px' : '10px' }};
         }
     </style>
 </head>
@@ -274,7 +276,9 @@
             <tr>
                 <th width="5%">No</th>
                 <th width="37%">Nama Barang</th>
-                <th width="13%">No Batch</th>
+                @unless ($largeText ?? false)
+                    <th width="13%">No Batch</th>
+                @endunless
                 <th width="9%">Qty</th>
                 <th width="9%">Satuan</th>
                 <th width="14%">Harga</th>
@@ -286,7 +290,9 @@
                 <tr>
                     <td class="text-center">{{ $index + 1 }}</td>
                     <td>{{ $item['medicine_name'] }}</td>
-                    <td class="batch-value text-center">{{ $item['batch_number'] ?: '-' }}</td>
+                    @unless ($largeText ?? false)
+                        <td class="batch-value text-center">{{ $item['batch_number'] ?: '-' }}</td>
+                    @endunless
                     <td class="text-center">{{ number_format((float) $item['quantity'], 0, ',', '.') }}</td>
                     <td class="text-center">{{ $item['unit_name'] }}</td>
                     <td class="text-right">Rp {{ number_format((float) $item['unit_price'], 0, ',', '.') }}</td>
